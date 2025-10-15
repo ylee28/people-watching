@@ -166,23 +166,56 @@ const augmentTimeline = (timeline: TimelinePerson[]): TimelinePerson[] => {
     person.track.sort((a, b) => a.t - b.t);
   });
   
-  // Enforce exits at t=300s for specified people
-  const exitIds = ['P02', 'P03', 'P05', 'P06', 'P07', 'P08', 'P09', 'P10', 'P12', 'P13'];
-  exitIds.forEach((id) => {
-    const person = augmented.find((p) => p.id === id);
-    if (!person) return;
-    
+  // Enforce exits: ALL 13 people exit by t=300s by moving OUTWARD past the rim
+  // Each person gets an exit angle within -10° to +20° (egress region)
+  // They tween from their position to radiusFactor > 1.05, then fade
+  augmented.forEach((person, idx) => {
     // Remove any existing exit
     person.track = person.track.filter((p) => p.action !== 'exit');
     
-    // Add walk to exit at 0° then exit
-    const lastNonExit = person.track[person.track.length - 1] || { t: 290, angleDeg: 0, radiusFactor: 0.92 };
+    // Determine last known position before exit
+    const lastNonExit = person.track[person.track.length - 1] || { 
+      t: 295, 
+      angleDeg: person.id === 'P01' ? 0 : person.id === 'P04' ? 120 : person.id === 'P11' ? 240 : idx * 30, 
+      radiusFactor: 0.92 
+    };
     
-    if (lastNonExit.t < 290) {
-      person.track.push({ t: 290, action: 'walk', angleDeg: 10, radiusFactor: 0.92 });
+    // Assign exit angle (spread within -10° to +20°)
+    const exitAngle = -10 + (idx / 12) * 30; // Distribute exits across egress zone
+    
+    // Move toward exit angle at rim (t=295-298s)
+    if (lastNonExit.t < 295) {
+      person.track.push({ 
+        t: 295, 
+        action: 'walk', 
+        angleDeg: exitAngle, 
+        radiusFactor: 0.92 
+      });
     }
     
-    person.track.push({ t: 300, action: 'exit', angleDeg: 0, radiusFactor: 0.92 });
+    // Move outward past rim (t=298-299s) - radiusFactor 0.92 → 1.08
+    person.track.push({ 
+      t: 298, 
+      action: 'walk', 
+      angleDeg: exitAngle, 
+      radiusFactor: 0.92 
+    });
+    
+    person.track.push({ 
+      t: 299.5, 
+      action: 'walk', 
+      angleDeg: exitAngle, 
+      radiusFactor: 1.08 
+    });
+    
+    // Exit (fade out at t=300s)
+    person.track.push({ 
+      t: 300, 
+      action: 'exit', 
+      angleDeg: exitAngle, 
+      radiusFactor: 1.08 
+    });
+    
     person.track.sort((a, b) => a.t - b.t);
   });
   

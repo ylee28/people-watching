@@ -21,8 +21,8 @@ const layerLabels: Record<LayerType, string> = {
   colors: "Colors",
   postures: "Postures",
   notes: "Notes",
-  movement: "Movement: Path",
-  coverage: "Movement: Coverage",
+  movement: "Path",
+  coverage: "Coverage",
 };
 
 const Index = () => {
@@ -307,6 +307,23 @@ const Index = () => {
                 />
               )}
 
+              {/* Left-side labels for exploded view */}
+              {introMode === "exploded" && (
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-40 flex flex-col gap-[72px] z-20">
+                  {layers.map((layer) => (
+                    <button
+                      key={layer}
+                      onClick={() => handleLayerClick(layer)}
+                      className="text-sm font-medium text-foreground hover:text-primary transition-colors text-left"
+                      aria-label={`Open ${layerLabels[layer]} layer`}
+                      aria-controls={`layer-${layer}`}
+                    >
+                      {layerLabels[layer]}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {/* Layer stack */}
               <div
                 className="relative"
@@ -335,6 +352,7 @@ const Index = () => {
                   return (
                     <motion.div
                       key={layer}
+                      id={`layer-${layer}`}
                       className="absolute"
                       style={{
                         zIndex: layers.length - idx,
