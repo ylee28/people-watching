@@ -49,6 +49,15 @@ const Index = () => {
     loadData();
     startPlaybackTicker();
   }, [loadData]);
+  
+  // Track window size for responsive oval spacing
+  const [windowWidth, setWindowWidth] = React.useState(typeof window !== 'undefined' ? window.innerWidth : 1280);
+  
+  React.useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -250,20 +259,32 @@ const Index = () => {
               transformStyle: "preserve-3d"
             }}>
                   {layers.map((layer, idx) => {
+                const circleDiameter = 520;
+                const ovalWidth = circleDiameter;
+                const ovalHeight = circleDiameter * 0.22; // 114.4px
+                
+                // Responsive gap based on screen width
+                const gap = windowWidth >= 1280 ? 96 : windowWidth >= 1024 ? 72 : 48;
+                
                 let yOffset = 0;
                 let shadow = "";
+                
                 if (introMode === "overlapped") {
                   yOffset = 0; // All perfectly overlapped
                 } else if (introMode === "exploded") {
-                  yOffset = idx * 72; // 72px spacing for no overlap
-                  shadow = "0 6px 12px rgba(0,0,0,0.08)";
+                  // y(i) = centerY + (i - 2) * (ovalHeight + gap)
+                  yOffset = (idx - 2) * (ovalHeight + gap);
+                  shadow = ""; // No shadow in exploded
                 }
+                
                 return <motion.div key={layer} id={`layer-${layer}`} className="absolute" style={{
                   zIndex: layers.length - idx + 10,
                   left: "50%",
                   top: "50%",
-                  marginLeft: -260,
-                  marginTop: -260,
+                  marginLeft: introMode === "exploded" ? -ovalWidth / 2 : -260,
+                  marginTop: introMode === "exploded" ? -ovalHeight / 2 : -260,
+                  width: introMode === "exploded" ? ovalWidth : 520,
+                  height: introMode === "exploded" ? ovalHeight : 520,
                   filter: shadow ? `drop-shadow(${shadow})` : undefined,
                   pointerEvents: introMode === "exploded" ? "auto" : "none",
                   cursor: introMode === "exploded" ? "pointer" : "default"
@@ -273,13 +294,37 @@ const Index = () => {
                 }} transition={{
                   duration: 0.6,
                   ease: "easeOut"
-                }} onClick={(e) => {
+                }} whileHover={introMode === "exploded" ? {
+                  scale: 1.02
+                } : undefined} onClick={(e) => {
                     if (introMode === "exploded") {
                       e.stopPropagation(); // Prevent background click
                       goToLayer(layer);
                     }
                   }}>
-                        {renderLayer(layer)}
+                        {introMode === "exploded" ? (
+                          // Render thin oval in exploded view
+                          <svg 
+                            width={ovalWidth} 
+                            height={ovalHeight} 
+                            viewBox={`0 0 ${ovalWidth} ${ovalHeight}`}
+                            style={{ display: 'block' }}
+                          >
+                            <ellipse
+                              cx={ovalWidth / 2}
+                              cy={ovalHeight / 2}
+                              rx={ovalWidth / 2 - 1}
+                              ry={ovalHeight / 2 - 1}
+                              fill="none"
+                              stroke="#D9D9D9"
+                              strokeWidth={1.5}
+                              className="transition-opacity duration-200 hover:opacity-80"
+                            />
+                          </svg>
+                        ) : (
+                          // Render full layer visualization in overlapped view
+                          renderLayer(layer)
+                        )}
                       </motion.div>;
               })}
                 </div>
