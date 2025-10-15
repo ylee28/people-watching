@@ -181,7 +181,7 @@ const Index = () => {
               <Label htmlFor="overlay-file" className="text-sm cursor-pointer">
                 Overlay:
               </Label>
-              <Input id="overlay-file" type="file" accept="image/png,image/svg+xml" onChange={handleFileUpload} className="w-40 text-xs" />
+              
             </div>
             
             {overlayImage && <>
