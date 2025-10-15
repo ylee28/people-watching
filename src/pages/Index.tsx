@@ -83,6 +83,10 @@ const Index = () => {
   const handleLayerClick = (layer: LayerType) => {
     setSelectedLayer(layer);
     setViewMode("focus");
+    // Ensure we're past intro when going to focus
+    if (introMode !== "tilted") {
+      setIntroMode("tilted");
+    }
   };
 
   const handleBack = () => {
@@ -316,7 +320,7 @@ const Index = () => {
                   if (introMode === "overlapped") {
                     yOffset = 0; // All perfectly overlapped
                   } else if (introMode === "exploded") {
-                    yOffset = idx * 48; // Even vertical spacing
+                    yOffset = idx * 60; // Increased spacing for better click targets
                     shadow = "0 6px 12px rgba(0,0,0,0.08)";
                   } else if (introMode === "tilted") {
                     yOffset = idx * 48;
@@ -335,6 +339,8 @@ const Index = () => {
                         marginLeft: -260,
                         marginTop: -260,
                         filter: shadow ? `drop-shadow(${shadow})` : undefined,
+                        pointerEvents: introMode === "exploded" ? "auto" : "none",
+                        cursor: introMode === "exploded" ? "pointer" : "default",
                       }}
                       initial={false}
                       animate={{
@@ -345,6 +351,7 @@ const Index = () => {
                         duration: introMode === "exploded" ? 0.8 : 0.6,
                         ease: "easeOut",
                       }}
+                      onClick={() => introMode === "exploded" && handleLayerClick(layer)}
                     >
                       {/* Label for tilted state */}
                       {introMode === "tilted" && (

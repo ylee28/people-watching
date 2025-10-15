@@ -1,6 +1,5 @@
 import * as React from "react";
-import { CircularGrid } from "../CircularGrid";
-import { motion } from "framer-motion";
+import { CircularGrid, polarToCartesian } from "../CircularGrid";
 import { usePeoplePlaybackStore } from "@/lib/usePeoplePlaybackStore";
 
 interface UnifiedCoverageProps {
@@ -8,107 +7,96 @@ interface UnifiedCoverageProps {
 }
 
 /**
- * Layer 5: Coverage - Shows expanding coverage rings based on people's traveled arcs
+ * Layer 5: Coverage - Shows accumulated footprint of where dots have been
  */
 export const UnifiedCoverage: React.FC<UnifiedCoverageProps> = ({ size = 520 }) => {
   const peopleAtTime = usePeoplePlaybackStore((state) => state.peopleAtTime);
   const timeSec = usePeoplePlaybackStore((state) => state.timeSec);
   const isPlaying = usePeoplePlaybackStore((state) => state.isPlaying);
   
+  const canvasRef = React.useRef<HTMLCanvasElement>(null);
+  const lastTimeRef = React.useRef<number>(0);
+  const lastPositionsRef = React.useRef<Map<string, { x: number; y: number }>>(new Map());
+  
   const center = size / 2;
-  const baseRadius = size / 2 - 60;
+  const maxRadius = size / 2 - 20;
 
-  // Compute coverage from traveled angles
-  const computeCoverage = () => {
-    const anglesCovered = new Set<number>();
-    
-    peopleAtTime.forEach((person) => {
-      if (!person.isVisible) return;
-      
-      person.pathHistory.forEach((pt) => {
-        // Sample angle in 5-degree increments
-        const normalizedAngle = Math.floor(pt.angleDeg / 5) * 5;
-        anglesCovered.add(normalizedAngle);
-      });
-    });
-    
-    return anglesCovered.size / 72; // 360/5 = 72 possible samples
+  // Helper to convert hex to rgba
+  const hexToRgba = (hex: string, alpha: number): string => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   };
 
-  const coverageProgress = computeCoverage();
-  const timeProgress = Math.min(timeSec / 300, 1);
+  // Clear canvas when time rewinds to 0
+  React.useEffect(() => {
+    if (timeSec < lastTimeRef.current || timeSec === 0) {
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.clearRect(0, 0, size, size);
+          lastPositionsRef.current.clear();
+        }
+      }
+    }
+    lastTimeRef.current = timeSec;
+  }, [timeSec, size]);
 
-  // Generate 3 rings with different coverage
-  const rings = [
-    { id: "ring1", color: "#3498db", radiusMult: 0.5, progress: coverageProgress * 0.8 },
-    { id: "ring2", color: "#2ecc71", radiusMult: 0.7, progress: coverageProgress * 0.9 },
-    { id: "ring3", color: "#f39c12", radiusMult: 0.9, progress: coverageProgress },
-  ];
+  // Stamp footprints on canvas
+  React.useEffect(() => {
+    if (!isPlaying) return;
+    
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    // Stamp a circle for each visible person at their current position
+    peopleAtTime
+      .filter((person) => person.isVisible)
+      .forEach((person) => {
+        const coord = polarToCartesian(
+          center,
+          center,
+          maxRadius * person.currentRadiusFactor,
+          person.currentAngleDeg
+        );
+
+        // Only stamp if position changed significantly (avoid over-stamping)
+        const lastPos = lastPositionsRef.current.get(person.id);
+        if (lastPos) {
+          const dist = Math.sqrt(
+            Math.pow(coord.x - lastPos.x, 2) + Math.pow(coord.y - lastPos.y, 2)
+          );
+          if (dist < 2) return; // Skip if moved less than 2px
+        }
+
+        // Stamp a small semi-transparent circle
+        ctx.fillStyle = hexToRgba(person.color, 0.08);
+        ctx.beginPath();
+        ctx.arc(coord.x, coord.y, 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Update last position
+        lastPositionsRef.current.set(person.id, { x: coord.x, y: coord.y });
+      });
+  }, [peopleAtTime, isPlaying, center, maxRadius]);
 
   return (
     <div className="relative" style={{ width: size, height: size }}>
       <CircularGrid size={size} />
-      <svg width={size} height={size} className="absolute inset-0">
-        <g>
-          {rings.map((ring) => {
-            const radius = baseRadius * ring.radiusMult;
-            const circumference = 2 * Math.PI * radius;
-            const dashLength = 10;
-            const gapLength = 5;
-            const strokeDasharray = `${dashLength} ${gapLength}`;
-            const dashOffset = circumference * (1 - ring.progress);
-
-            return (
-              <g key={ring.id}>
-                {/* Background ring */}
-                <circle
-                  cx={center}
-                  cy={center}
-                  r={radius}
-                  fill="none"
-                  stroke={ring.color}
-                  strokeWidth="3"
-                  strokeDasharray={strokeDasharray}
-                  opacity="0.2"
-                />
-                
-                {/* Progress ring (rotates when playing) */}
-                <motion.circle
-                  cx={center}
-                  cy={center}
-                  r={radius}
-                  fill="none"
-                  stroke={ring.color}
-                  strokeWidth="3"
-                  strokeDasharray={strokeDasharray}
-                  strokeDashoffset={dashOffset}
-                  opacity="0.8"
-                  animate={isPlaying ? { rotate: timeProgress * 360 } : { rotate: 0 }}
-                  transition={{ duration: 0.5, ease: "linear" }}
-                  style={{ originX: "50%", originY: "50%" }}
-                />
-
-                {/* Expanding pulse when playing */}
-                {isPlaying && radius > 0 && (
-                  <motion.circle
-                    cx={center}
-                    cy={center}
-                    r={radius}
-                    fill="none"
-                    stroke={ring.color}
-                    strokeWidth="2"
-                    opacity="0.4"
-                    initial={{ scale: 0.95, opacity: 0.6 }}
-                    animate={{ scale: 1.05, opacity: 0 }}
-                    transition={{ duration: 2, repeat: Infinity, ease: "easeOut" }}
-                    style={{ originX: "50%", originY: "50%" }}
-                  />
-                )}
-              </g>
-            );
-          })}
-        </g>
-      </svg>
+      
+      {/* Off-screen canvas for footprint accumulation */}
+      <canvas
+        ref={canvasRef}
+        width={size}
+        height={size}
+        className="absolute inset-0"
+        style={{ pointerEvents: "none" }}
+      />
     </div>
   );
 };

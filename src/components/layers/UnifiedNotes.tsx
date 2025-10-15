@@ -42,20 +42,14 @@ export const UnifiedNotes: React.FC<UnifiedNotesProps> = ({ size = 520 }) => {
 
               return (
                 <g key={person.id}>
-                  <circle
-                    cx={coord.x}
-                    cy={coord.y}
-                    r="6"
-                    fill="hsl(var(--primary))"
-                    opacity="0.3"
-                  />
                   <text
                     x={coord.x}
-                    y={coord.y - 15}
+                    y={coord.y}
                     textAnchor="middle"
+                    dominantBaseline="middle"
                     fontSize={isHovered ? "11" : "10"}
                     fill="hsl(var(--foreground))"
-                    style={{ cursor: "pointer" }}
+                    style={{ cursor: "pointer", maxWidth: "80px" }}
                     onMouseEnter={() => setHoveredId(person.id)}
                     onMouseLeave={() => setHoveredId(null)}
                     onClick={() => navigate(`/person/${person.id}`)}
@@ -66,7 +60,7 @@ export const UnifiedNotes: React.FC<UnifiedNotesProps> = ({ size = 520 }) => {
                     <g>
                       <rect
                         x={coord.x - 60}
-                        y={coord.y + 10}
+                        y={coord.y + 15}
                         width={120}
                         height={40}
                         fill="rgba(0,0,0,0.9)"
@@ -74,8 +68,9 @@ export const UnifiedNotes: React.FC<UnifiedNotesProps> = ({ size = 520 }) => {
                       />
                       <text
                         x={coord.x}
-                        y={coord.y + 30}
+                        y={coord.y + 35}
                         textAnchor="middle"
+                        dominantBaseline="middle"
                         fill="#fff"
                         fontSize="10"
                       >
