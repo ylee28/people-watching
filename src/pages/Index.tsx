@@ -11,6 +11,7 @@ import { UnifiedMovement } from "@/components/layers/UnifiedMovement";
 import { UnifiedCoverage } from "@/components/layers/UnifiedCoverage";
 import { Timer } from "@/components/Timer";
 import { TimelineControls } from "@/components/TimelineControls";
+import { LayerNavButtons } from "@/components/LayerNavButtons";
 import { usePeoplePlaybackStore, startPlaybackTicker } from "@/lib/usePeoplePlaybackStore";
 type ViewMode = "intro" | "stack" | "focus";
 type IntroMode = "overlapped" | "exploded" | "tilted";
@@ -79,13 +80,9 @@ const Index = () => {
       setViewMode("stack");
     }
   };
-  const handleLayerClick = (layer: LayerType) => {
+  const goToLayer = (layer: LayerType) => {
     setSelectedLayer(layer);
     setViewMode("focus");
-    // Ensure we're past intro when going to focus
-    if (introMode !== "tilted") {
-      setIntroMode("tilted");
-    }
   };
   const handleBack = () => {
     if (viewMode === "focus") {
@@ -220,12 +217,14 @@ const Index = () => {
             zIndex: 10
           }} onClick={handleIntroClick} role="button" tabIndex={0} onKeyDown={e => e.key === "Enter" && handleIntroClick()} aria-label="Click to explode layers" />}
 
-              {/* Left-side labels for exploded view */}
-              {introMode === "exploded" && <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-40 flex flex-col gap-[72px]" style={{ zIndex: 100, pointerEvents: 'auto' }}>
-                  {layers.map(layer => <button key={layer} onClick={() => handleLayerClick(layer)} className="text-sm font-medium text-foreground hover:text-primary transition-colors text-left px-3 py-2 hover:bg-accent rounded-md cursor-pointer" style={{ pointerEvents: 'auto' }} aria-label={`Open ${layerLabels[layer]} layer`} aria-controls={`layer-${layer}`}>
-                      {layerLabels[layer]}
-                    </button>)}
-                </div>}
+              {/* Layer navigation buttons - Desktop: left side vertical, Mobile: bottom horizontal */}
+              <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-[200px] hidden lg:block" style={{ zIndex: 100 }}>
+                <LayerNavButtons onSelect={goToLayer} activeLayer={selectedLayer} layout="vertical" />
+              </div>
+              
+              <div className="absolute -bottom-28 left-1/2 -translate-x-1/2 w-full max-w-md lg:hidden" style={{ zIndex: 100 }}>
+                <LayerNavButtons onSelect={goToLayer} activeLayer={selectedLayer} layout="horizontal" />
+              </div>
 
               {/* Layer stack */}
               <div className="relative" style={{
@@ -261,7 +260,7 @@ const Index = () => {
               }} transition={{
                 duration: introMode === "exploded" ? 0.8 : 0.6,
                 ease: "easeOut"
-              }} onClick={() => introMode === "exploded" && handleLayerClick(layer)}>
+              }} onClick={() => introMode === "exploded" && goToLayer(layer)}>
                       {/* Label for tilted state */}
                       {introMode === "tilted" && <div className="absolute -left-32 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground">
                           {layerLabels[layer]}
@@ -303,7 +302,7 @@ const Index = () => {
             rotateX: 55
           }} whileHover={{
             scale: 1.05
-          }} onClick={() => handleLayerClick(layer)} role="button" tabIndex={0} onKeyDown={e => e.key === "Enter" && handleLayerClick(layer)}>
+          }} onClick={() => goToLayer(layer)} role="button" tabIndex={0} onKeyDown={e => e.key === "Enter" && goToLayer(layer)}>
                   <div className="relative bg-background border-2 border-border rounded-lg p-4 shadow-lg">
                     <div className="flex items-center justify-between gap-4">
                       <span className="text-sm font-medium">{layerLabels[layer]}</span>
