@@ -262,30 +262,33 @@ const Index = () => {
                 const circleDiameter = 520;
                 const ovalWidth = circleDiameter;
                 const ovalHeight = circleDiameter * 0.22; // 114.4px
+                const ellipseScaleY = 0.22; // vertical squash factor
                 
                 // Responsive gap based on screen width
                 const gap = windowWidth >= 1280 ? 96 : windowWidth >= 1024 ? 72 : 48;
                 
                 let yOffset = 0;
-                let shadow = "";
+                let containerHeight = circleDiameter;
                 
                 if (introMode === "overlapped") {
                   yOffset = 0; // All perfectly overlapped
                 } else if (introMode === "exploded") {
                   // y(i) = centerY + (i - 2) * (ovalHeight + gap)
                   yOffset = (idx - 2) * (ovalHeight + gap);
-                  shadow = ""; // No shadow in exploded
+                  containerHeight = ovalHeight;
                 }
                 
-                return <motion.div key={layer} id={`layer-${layer}`} className="absolute" style={{
+                // Unique clipPath ID for each layer
+                const clipId = `oval-clip-${layer}`;
+                
+                return <motion.div key={layer} id={`layer-${layer}`} className="absolute overflow-hidden" style={{
                   zIndex: layers.length - idx + 10,
                   left: "50%",
                   top: "50%",
-                  marginLeft: introMode === "exploded" ? -ovalWidth / 2 : -260,
-                  marginTop: introMode === "exploded" ? -ovalHeight / 2 : -260,
-                  width: introMode === "exploded" ? ovalWidth : 520,
-                  height: introMode === "exploded" ? ovalHeight : 520,
-                  filter: shadow ? `drop-shadow(${shadow})` : undefined,
+                  marginLeft: -ovalWidth / 2,
+                  marginTop: introMode === "exploded" ? -ovalHeight / 2 : -circleDiameter / 2,
+                  width: ovalWidth,
+                  height: containerHeight,
                   pointerEvents: introMode === "exploded" ? "auto" : "none",
                   cursor: introMode === "exploded" ? "pointer" : "default"
                 }} initial={false} animate={{
@@ -303,23 +306,40 @@ const Index = () => {
                     }
                   }}>
                         {introMode === "exploded" ? (
-                          // Render thin oval in exploded view
+                          // Render live layer visualization in thin oval (with scaleY transform)
                           <svg 
                             width={ovalWidth} 
                             height={ovalHeight} 
                             viewBox={`0 0 ${ovalWidth} ${ovalHeight}`}
                             style={{ display: 'block' }}
                           >
-                            <ellipse
-                              cx={ovalWidth / 2}
-                              cy={ovalHeight / 2}
-                              rx={ovalWidth / 2 - 1}
-                              ry={ovalHeight / 2 - 1}
-                              fill="none"
-                              stroke="#D9D9D9"
-                              strokeWidth={1.5}
-                              className="transition-opacity duration-200 hover:opacity-80"
-                            />
+                            <defs>
+                              {/* Ellipse clipPath */}
+                              <clipPath id={clipId}>
+                                <ellipse
+                                  cx={ovalWidth / 2}
+                                  cy={ovalHeight / 2}
+                                  rx={ovalWidth / 2 - 1}
+                                  ry={ovalHeight / 2 - 1}
+                                />
+                              </clipPath>
+                            </defs>
+                            
+                            {/* Container for scaled visualization */}
+                            <g clipPath={`url(#${clipId})`}>
+                              {/* Scale the entire layer visualization vertically */}
+                              <g transform={`translate(${ovalWidth / 2}, ${ovalHeight / 2}) scale(1, ${ellipseScaleY}) translate(-${circleDiameter / 2}, -${circleDiameter / 2})`}>
+                                <foreignObject 
+                                  width={circleDiameter} 
+                                  height={circleDiameter}
+                                  style={{ pointerEvents: 'none' }}
+                                >
+                                  <div style={{ width: circleDiameter, height: circleDiameter }}>
+                                    {renderLayer(layer)}
+                                  </div>
+                                </foreignObject>
+                              </g>
+                            </g>
                           </svg>
                         ) : (
                           // Render full layer visualization in overlapped view
