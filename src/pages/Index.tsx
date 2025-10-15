@@ -261,10 +261,6 @@ const Index = () => {
                 duration: introMode === "exploded" ? 0.8 : 0.6,
                 ease: "easeOut"
               }} onClick={() => introMode === "exploded" && goToLayer(layer)}>
-                      {/* Label for tilted state */}
-                      {introMode === "tilted" && <div className="absolute -left-32 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground">
-                          {layerLabels[layer]}
-                        </div>}
                       {renderLayer(layer)}
                     </motion.div>;
             })}
