@@ -103,20 +103,3 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
-
-@keyframes ring-grow {
-  0% {
-    r: 0;
-    opacity: 0;
-  }
-  50% {
-    opacity: 0.6;
-  }
-  100% {
-    opacity: 0.6;
-  }
-}
-
-.animate-ring-grow {
-  animation: ring-grow 1s ease-out forwards;
-}

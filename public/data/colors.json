@@ -1,0 +1,7 @@
+[
+  { "id": "p1", "angleDeg": 20, "color": "#c0392b" },
+  { "id": "p2", "angleDeg": 70, "color": "#27ae60" },
+  { "id": "p3", "angleDeg": 120, "color": "#3498db" },
+  { "id": "p4", "angleDeg": 200, "color": "#f39c12" },
+  { "id": "p5", "angleDeg": 280, "color": "#9b59b6" }
+]

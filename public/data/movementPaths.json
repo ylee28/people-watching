@@ -1,0 +1,23 @@
+[
+  {
+    "id": "m1",
+    "color": "#2ecc71",
+    "points": [
+      { "angleDeg": 330, "radiusFactor": 0.9 },
+      { "angleDeg": 350, "radiusFactor": 0.85 },
+      { "angleDeg": 20, "radiusFactor": 0.9 },
+      { "angleDeg": 50, "radiusFactor": 0.8 },
+      { "angleDeg": 80, "radiusFactor": 0.85 }
+    ]
+  },
+  {
+    "id": "m2",
+    "color": "#e74c3c",
+    "points": [
+      { "angleDeg": 100, "radiusFactor": 0.95 },
+      { "angleDeg": 140, "radiusFactor": 0.9 },
+      { "angleDeg": 180, "radiusFactor": 0.85 },
+      { "angleDeg": 220, "radiusFactor": 0.9 }
+    ]
+  }
+]

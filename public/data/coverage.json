@@ -1,0 +1,5 @@
+[
+  { "id": "c1", "progress": 0.35, "color": "#16a085" },
+  { "id": "c2", "progress": 0.7, "color": "#9b59b6" },
+  { "id": "c3", "progress": 0.5, "color": "#e67e22" }
+]

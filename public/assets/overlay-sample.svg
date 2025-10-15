@@ -1,0 +1,5 @@
+<svg width="520" height="520" viewBox="0 0 520 520" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="260" cy="260" r="200" stroke="#e74c3c" stroke-width="2" stroke-dasharray="10 5" fill="none" opacity="0.3"/>
+  <circle cx="260" cy="260" r="150" stroke="#3498db" stroke-width="2" stroke-dasharray="10 5" fill="none" opacity="0.3"/>
+  <text x="260" y="260" text-anchor="middle" fill="#95a5a6" font-size="14" font-family="Arial">Overlay Sample</text>
+</svg>

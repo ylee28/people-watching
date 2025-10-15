@@ -1,0 +1,7 @@
+[
+  { "id": "p6", "angleDeg": 45, "posture": "upright" },
+  { "id": "p7", "angleDeg": 95, "posture": "leaning" },
+  { "id": "p8", "angleDeg": 160, "posture": "curled" },
+  { "id": "p9", "angleDeg": 230, "posture": "phone" },
+  { "id": "p10", "angleDeg": 310, "posture": "reading" }
+]
