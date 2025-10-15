@@ -29,23 +29,7 @@ export const LayerNavButtons: React.FC<LayerNavButtonsProps> = ({
   return <div className={`flex ${layout === "vertical" ? "flex-col gap-3" : "flex-row gap-2 overflow-x-auto pb-2"}`}>
       {layers.map(layer => {
       const isActive = activeLayer === layer;
-      return (
-        <motion.button
-          key={layer}
-          onClick={() => onSelect(layer)}
-          className={`
-            px-4 py-2 rounded-lg font-medium text-sm transition-all
-            ${isActive 
-              ? 'bg-primary text-primary-foreground shadow-md' 
-              : 'bg-secondary hover:bg-secondary/80 text-secondary-foreground'
-            }
-          `}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          {layerLabels[layer]}
-        </motion.button>
-      );
+      return;
     })}
     </div>;
 };
