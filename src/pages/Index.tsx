@@ -221,8 +221,8 @@ const Index = () => {
           }} onClick={handleIntroClick} role="button" tabIndex={0} onKeyDown={e => e.key === "Enter" && handleIntroClick()} aria-label="Click to explode layers" />}
 
               {/* Left-side labels for exploded view */}
-              {introMode === "exploded" && <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-40 flex flex-col gap-[72px] z-20">
-                  {layers.map(layer => <button key={layer} onClick={() => handleLayerClick(layer)} className="text-sm font-medium text-foreground hover:text-primary transition-colors text-left" aria-label={`Open ${layerLabels[layer]} layer`} aria-controls={`layer-${layer}`}>
+              {introMode === "exploded" && <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-40 flex flex-col gap-[72px]" style={{ zIndex: 100, pointerEvents: 'auto' }}>
+                  {layers.map(layer => <button key={layer} onClick={() => handleLayerClick(layer)} className="text-sm font-medium text-foreground hover:text-primary transition-colors text-left px-3 py-2 hover:bg-accent rounded-md cursor-pointer" style={{ pointerEvents: 'auto' }} aria-label={`Open ${layerLabels[layer]} layer`} aria-controls={`layer-${layer}`}>
                       {layerLabels[layer]}
                     </button>)}
                 </div>}
