@@ -13,8 +13,8 @@ import { Timer } from "@/components/Timer";
 import { TimelineControls } from "@/components/TimelineControls";
 import { LayerNavButtons } from "@/components/LayerNavButtons";
 import { usePeoplePlaybackStore, startPlaybackTicker } from "@/lib/usePeoplePlaybackStore";
-type ViewMode = "intro" | "stack" | "focus";
-type IntroMode = "overlapped" | "exploded" | "tilted";
+type ViewMode = "intro" | "focus";
+type IntroMode = "overlapped" | "exploded";
 type LayerType = "colors" | "postures" | "notes" | "movement" | "coverage";
 const layerLabels: Record<LayerType, string> = {
   colors: "Colors",
@@ -72,25 +72,33 @@ const Index = () => {
   const handleIntroClick = () => {
     if (introMode === "overlapped") {
       setIntroMode("exploded");
-      // After explosion animation, transition to tilted
-      setTimeout(() => {
-        setIntroMode("tilted");
-      }, 800);
-    } else if (introMode === "tilted") {
-      setViewMode("stack");
     }
   };
+  
+  const handleBackgroundClick = () => {
+    if (introMode === "exploded") {
+      setIntroMode("overlapped");
+    }
+  };
+  
+  // Keyboard support: Esc to return to overlapped
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && introMode === "exploded") {
+        setIntroMode("overlapped");
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [introMode]);
   const goToLayer = (layer: LayerType) => {
     setSelectedLayer(layer);
     setViewMode("focus");
   };
   const handleBack = () => {
     if (viewMode === "focus") {
-      setViewMode("stack");
-      setSelectedLayer(null);
-    } else if (viewMode === "stack") {
       setViewMode("intro");
-      setIntroMode("tilted");
+      setSelectedLayer(null);
     }
   };
   const renderLayer = (layer: LayerType) => {
@@ -126,11 +134,11 @@ const Index = () => {
           }} size="sm">
               Intro
             </Button>
-            <Button variant={viewMode === "stack" ? "default" : "outline"} onClick={() => setViewMode("stack")} size="sm">
-              Layers
-            </Button>
             {viewMode === "focus" && <Button variant="outline" onClick={handleBack} size="sm">
                 Back
+              </Button>}
+            {introMode === "exploded" && viewMode === "intro" && <Button variant="outline" onClick={handleBackgroundClick} size="sm">
+                Back to Overlapped
               </Button>}
           </div>
 
@@ -189,125 +197,108 @@ const Index = () => {
       </div>
 
       {/* Main visualization area */}
-      <div className="max-w-7xl mx-auto flex justify-center items-center min-h-[600px]">
+      <div className="max-w-7xl mx-auto flex justify-center items-center min-h-[600px] gap-8">
+        {/* Layer navigation buttons - beside the grid, not overlaying */}
+        {viewMode === "intro" && (
+          <div className="hidden lg:block flex-shrink-0">
+            <LayerNavButtons onSelect={goToLayer} activeLayer={selectedLayer} layout="vertical" />
+          </div>
+        )}
+        
         <AnimatePresence mode="wait">
-          {/* INTRO VIEW - Overlapped → Exploded → Tilted */}
+          {/* INTRO VIEW - Overlapped ↔ Exploded */}
           {viewMode === "intro" && <motion.div key="intro" initial={{
           opacity: 0
         }} animate={{
           opacity: 1
         }} exit={{
           opacity: 0
-        }} className="relative" style={{
-          perspective: introMode === "tilted" ? "1000px" : "none"
-        }}>
-              {/* Intro Style Reference Overlay (below) */}
-              {introStyleImage && introStylePosition === "below" && <img src={introStyleImage} alt="Intro style reference" className="absolute inset-0 m-auto pointer-events-none" style={{
-            width: 520,
-            height: 520,
-            opacity: introStyleOpacity / 100,
-            zIndex: 0
-          }} />}
-
-              {/* Circular click area for overlapped state */}
-              {introMode === "overlapped" && <div className="absolute inset-0 m-auto cursor-pointer" style={{
-            width: 520,
-            height: 520,
-            borderRadius: "50%",
-            zIndex: 10
-          }} onClick={handleIntroClick} role="button" tabIndex={0} onKeyDown={e => e.key === "Enter" && handleIntroClick()} aria-label="Click to explode layers" />}
-
-              {/* Layer navigation buttons - Desktop: left side vertical, Mobile: bottom horizontal */}
-              <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-[200px] hidden lg:block" style={{ zIndex: 100 }}>
-                <LayerNavButtons onSelect={goToLayer} activeLayer={selectedLayer} layout="vertical" />
-              </div>
-              
-              <div className="absolute -bottom-28 left-1/2 -translate-x-1/2 w-full max-w-md lg:hidden" style={{ zIndex: 100 }}>
+        }} className="relative flex flex-col items-center gap-6">
+              {/* Mobile buttons - above grid */}
+              <div className="lg:hidden w-full max-w-md">
                 <LayerNavButtons onSelect={goToLayer} activeLayer={selectedLayer} layout="horizontal" />
               </div>
-
-              {/* Layer stack */}
+              
               <div className="relative" style={{
-            transformStyle: "preserve-3d",
-            cursor: introMode === "tilted" ? "pointer" : "default"
-          }} onClick={introMode === "tilted" ? handleIntroClick : undefined}>
-                {layers.map((layer, idx) => {
-              let yOffset = 0;
-              let rotateX = 0;
-              let shadow = "";
-              if (introMode === "overlapped") {
-                yOffset = 0; // All perfectly overlapped
-              } else if (introMode === "exploded") {
-                yOffset = idx * 72; // 72px spacing for no overlap
-                shadow = "0 6px 12px rgba(0,0,0,0.08)";
-              } else if (introMode === "tilted") {
-                yOffset = idx * 48;
-                rotateX = 58;
-                shadow = "0 6px 12px rgba(0,0,0,0.08)";
-              }
-              return <motion.div key={layer} id={`layer-${layer}`} className="absolute" style={{
-                zIndex: layers.length - idx,
-                left: "50%",
-                top: "50%",
-                marginLeft: -260,
-                marginTop: -260,
-                filter: shadow ? `drop-shadow(${shadow})` : undefined,
-                pointerEvents: introMode === "exploded" ? "auto" : "none",
-                cursor: introMode === "exploded" ? "pointer" : "default"
-              }} initial={false} animate={{
-                y: yOffset,
-                rotateX: rotateX
-              }} transition={{
-                duration: introMode === "exploded" ? 0.8 : 0.6,
-                ease: "easeOut"
-              }} onClick={() => introMode === "exploded" && goToLayer(layer)}>
-                      {renderLayer(layer)}
-                    </motion.div>;
-            })}
+            perspective: "none"
+          }}>
+                {/* Intro Style Reference Overlay (below) */}
+                {introStyleImage && introStylePosition === "below" && <img src={introStyleImage} alt="Intro style reference" className="absolute inset-0 m-auto pointer-events-none" style={{
+              width: 520,
+              height: 520,
+              opacity: introStyleOpacity / 100,
+              zIndex: 0
+            }} />}
+
+                {/* Circular click area for overlapped state */}
+                {introMode === "overlapped" && <div className="absolute inset-0 m-auto cursor-pointer" style={{
+              width: 520,
+              height: 520,
+              borderRadius: "50%",
+              zIndex: 10
+            }} onClick={handleIntroClick} role="button" tabIndex={0} onKeyDown={e => e.key === "Enter" && handleIntroClick()} aria-label="Click to explode layers" />}
+
+                {/* Background click area for exploded state */}
+                {introMode === "exploded" && <div className="absolute inset-0 m-auto cursor-pointer" style={{
+              width: 600,
+              height: 600,
+              zIndex: 1
+            }} onClick={handleBackgroundClick} aria-label="Click background to return to overlapped view" />}
+
+                {/* Layer stack */}
+                <div className="relative" style={{
+              transformStyle: "preserve-3d"
+            }}>
+                  {layers.map((layer, idx) => {
+                let yOffset = 0;
+                let shadow = "";
+                if (introMode === "overlapped") {
+                  yOffset = 0; // All perfectly overlapped
+                } else if (introMode === "exploded") {
+                  yOffset = idx * 72; // 72px spacing for no overlap
+                  shadow = "0 6px 12px rgba(0,0,0,0.08)";
+                }
+                return <motion.div key={layer} id={`layer-${layer}`} className="absolute" style={{
+                  zIndex: layers.length - idx + 10,
+                  left: "50%",
+                  top: "50%",
+                  marginLeft: -260,
+                  marginTop: -260,
+                  filter: shadow ? `drop-shadow(${shadow})` : undefined,
+                  pointerEvents: introMode === "exploded" ? "auto" : "none",
+                  cursor: introMode === "exploded" ? "pointer" : "default"
+                }} initial={false} animate={{
+                  y: yOffset,
+                  rotateX: 0
+                }} transition={{
+                  duration: 0.6,
+                  ease: "easeOut"
+                }} onClick={(e) => {
+                    if (introMode === "exploded") {
+                      e.stopPropagation(); // Prevent background click
+                      goToLayer(layer);
+                    }
+                  }}>
+                        {renderLayer(layer)}
+                      </motion.div>;
+              })}
+                </div>
+
+                {/* Intro Style Reference Overlay (above) */}
+                {introStyleImage && introStylePosition === "above" && <img src={introStyleImage} alt="Intro style reference" className="absolute inset-0 m-auto pointer-events-none" style={{
+              width: 520,
+              height: 520,
+              opacity: introStyleOpacity / 100,
+              zIndex: 20
+            }} />}
               </div>
 
-              {/* Intro Style Reference Overlay (above) */}
-              {introStyleImage && introStylePosition === "above" && <img src={introStyleImage} alt="Intro style reference" className="absolute inset-0 m-auto pointer-events-none" style={{
-            width: 520,
-            height: 520,
-            opacity: introStyleOpacity / 100,
-            zIndex: 20
-          }} />}
-
-              {introMode === "overlapped" && <p className="text-center mt-4 text-sm text-muted-foreground">
+              {introMode === "overlapped" && <p className="text-center text-sm text-muted-foreground">
                   Click the circle to explode layers
                 </p>}
-              {introMode === "tilted"}
-            </motion.div>}
-
-          {/* STACK VIEW - Tilted ovals */}
-          {viewMode === "stack" && <motion.div key="stack" initial={{
-          opacity: 0
-        }} animate={{
-          opacity: 1
-        }} exit={{
-          opacity: 0
-        }} className="space-y-4" style={{
-          perspective: "1000px"
-        }}>
-              {layers.map((layer, idx) => <motion.div key={layer} className="cursor-pointer" style={{
-            transformStyle: "preserve-3d"
-          }} initial={{
-            rotateX: 0
-          }} animate={{
-            rotateX: 55
-          }} whileHover={{
-            scale: 1.05
-          }} onClick={() => goToLayer(layer)} role="button" tabIndex={0} onKeyDown={e => e.key === "Enter" && goToLayer(layer)}>
-                  <div className="relative bg-background border-2 border-border rounded-lg p-4 shadow-lg">
-                    <div className="flex items-center justify-between gap-4">
-                      <span className="text-sm font-medium">{layerLabels[layer]}</span>
-                      <div className="w-16 h-16 bg-muted rounded-full border-2 border-border flex items-center justify-center text-xs" style={{
-                  background: `conic-gradient(from 0deg, hsl(var(--primary)) 0%, hsl(var(--muted)) 100%)`
-                }} />
-                    </div>
-                  </div>
-                </motion.div>)}
+              {introMode === "exploded" && <p className="text-center text-sm text-muted-foreground">
+                  Click a layer to view • Click background or press Esc to collapse
+                </p>}
             </motion.div>}
 
           {/* FOCUS VIEW - Single layer full circle */}
