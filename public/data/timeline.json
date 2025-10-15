@@ -1,0 +1,119 @@
+[
+  {
+    "id": "p01",
+    "track": [
+      { "t": 0, "action": "sit", "angleDeg": 5, "radiusFactor": 0.92 },
+      { "t": 190, "action": "stand", "angleDeg": 5, "radiusFactor": 0.75 },
+      { "t": 195, "action": "walk", "angleDeg": 350, "radiusFactor": 0.6 },
+      { "t": 210, "action": "queue", "angleDeg": 340, "radiusFactor": 0.4 },
+      { "t": 280, "action": "board", "angleDeg": 0, "radiusFactor": 0.1 }
+    ]
+  },
+  {
+    "id": "p02",
+    "track": [
+      { "t": 0, "action": "sit", "angleDeg": 10, "radiusFactor": 0.92 },
+      { "t": 185, "action": "stand", "angleDeg": 10, "radiusFactor": 0.75 },
+      { "t": 192, "action": "walk", "angleDeg": 355, "radiusFactor": 0.6 },
+      { "t": 215, "action": "queue", "angleDeg": 345, "radiusFactor": 0.35 },
+      { "t": 285, "action": "board", "angleDeg": 0, "radiusFactor": 0.1 }
+    ]
+  },
+  {
+    "id": "p03",
+    "track": [
+      { "t": 0, "action": "sit", "angleDeg": 60, "radiusFactor": 0.92 },
+      { "t": 300, "action": "sit", "angleDeg": 60, "radiusFactor": 0.92 }
+    ]
+  },
+  {
+    "id": "p04",
+    "track": [
+      { "t": 0, "action": "sit", "angleDeg": 75, "radiusFactor": 0.92 },
+      { "t": 200, "action": "stand", "angleDeg": 75, "radiusFactor": 0.75 },
+      { "t": 208, "action": "walk", "angleDeg": 50, "radiusFactor": 0.6 },
+      { "t": 230, "action": "walk", "angleDeg": 15, "radiusFactor": 0.5 },
+      { "t": 250, "action": "queue", "angleDeg": 350, "radiusFactor": 0.38 },
+      { "t": 295, "action": "board", "angleDeg": 0, "radiusFactor": 0.1 }
+    ]
+  },
+  {
+    "id": "p05",
+    "track": [
+      { "t": 0, "action": "sit", "angleDeg": 85, "radiusFactor": 0.92 },
+      { "t": 300, "action": "sit", "angleDeg": 85, "radiusFactor": 0.92 }
+    ]
+  },
+  {
+    "id": "p06",
+    "track": [
+      { "t": 0, "action": "sit", "angleDeg": 100, "radiusFactor": 0.92 },
+      { "t": 300, "action": "sit", "angleDeg": 100, "radiusFactor": 0.92 }
+    ]
+  },
+  {
+    "id": "p07",
+    "track": [
+      { "t": 0, "action": "sit", "angleDeg": 115, "radiusFactor": 0.92 },
+      { "t": 182, "action": "stand", "angleDeg": 115, "radiusFactor": 0.75 },
+      { "t": 195, "action": "walk", "angleDeg": 140, "radiusFactor": 0.6 },
+      { "t": 220, "action": "walk", "angleDeg": 330, "radiusFactor": 0.45 },
+      { "t": 290, "action": "exit", "angleDeg": 330, "radiusFactor": 0.05 }
+    ]
+  },
+  {
+    "id": "p08",
+    "track": [
+      { "t": 0, "action": "sit", "angleDeg": 170, "radiusFactor": 0.92 },
+      { "t": 300, "action": "sit", "angleDeg": 170, "radiusFactor": 0.92 }
+    ]
+  },
+  {
+    "id": "p09",
+    "track": [
+      { "t": 0, "action": "sit", "angleDeg": 190, "radiusFactor": 0.92 },
+      { "t": 188, "action": "stand", "angleDeg": 190, "radiusFactor": 0.75 },
+      { "t": 200, "action": "walk", "angleDeg": 220, "radiusFactor": 0.6 },
+      { "t": 235, "action": "walk", "angleDeg": 320, "radiusFactor": 0.42 },
+      { "t": 288, "action": "exit", "angleDeg": 330, "radiusFactor": 0.05 }
+    ]
+  },
+  {
+    "id": "p10",
+    "track": [
+      { "t": 0, "action": "sit", "angleDeg": 245, "radiusFactor": 0.92 },
+      { "t": 300, "action": "sit", "angleDeg": 245, "radiusFactor": 0.92 }
+    ]
+  },
+  {
+    "id": "p11",
+    "track": [
+      { "t": 0, "action": "sit", "angleDeg": 260, "radiusFactor": 0.92 },
+      { "t": 195, "action": "stand", "angleDeg": 260, "radiusFactor": 0.75 },
+      { "t": 210, "action": "walk", "angleDeg": 290, "radiusFactor": 0.6 },
+      { "t": 240, "action": "walk", "angleDeg": 340, "radiusFactor": 0.43 },
+      { "t": 292, "action": "board", "angleDeg": 0, "radiusFactor": 0.1 }
+    ]
+  },
+  {
+    "id": "p12",
+    "track": [
+      { "t": 0, "action": "stand", "angleDeg": 150, "radiusFactor": 0.40 },
+      { "t": 50, "action": "walk", "angleDeg": 170, "radiusFactor": 0.5 },
+      { "t": 80, "action": "sit", "angleDeg": 180, "radiusFactor": 0.92 },
+      { "t": 192, "action": "stand", "angleDeg": 180, "radiusFactor": 0.75 },
+      { "t": 205, "action": "walk", "angleDeg": 280, "radiusFactor": 0.55 },
+      { "t": 245, "action": "walk", "angleDeg": 335, "radiusFactor": 0.4 },
+      { "t": 287, "action": "board", "angleDeg": 0, "radiusFactor": 0.1 }
+    ]
+  },
+  {
+    "id": "p13",
+    "track": [
+      { "t": 0, "action": "stand", "angleDeg": 270, "radiusFactor": 0.35 },
+      { "t": 40, "action": "walk", "angleDeg": 285, "radiusFactor": 0.5 },
+      { "t": 70, "action": "sit", "angleDeg": 295, "radiusFactor": 0.92 },
+      { "t": 300, "action": "sit", "angleDeg": 295, "radiusFactor": 0.92 }
+    ]
+  }
+]

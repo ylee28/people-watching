@@ -9,6 +9,7 @@ import { StaticPostures } from "@/components/layers/StaticPostures";
 import { StaticNotes } from "@/components/layers/StaticNotes";
 import { DynamicMovement } from "@/components/layers/DynamicMovement";
 import { DynamicCoverage } from "@/components/layers/DynamicCoverage";
+import { Timer } from "@/components/Timer";
 
 type ViewMode = "intro" | "stack" | "focus";
 type IntroMode = "overlapped" | "exploded" | "tilted";
@@ -32,8 +33,22 @@ const Index = () => {
   const [introStyleImage, setIntroStyleImage] = React.useState<string | null>(null);
   const [introStyleOpacity, setIntroStyleOpacity] = React.useState(30);
   const [introStylePosition, setIntroStylePosition] = React.useState<"above" | "below">("below");
+  
+  // Timer state
+  const [currentTime, setCurrentTime] = React.useState(0); // 0-300 seconds
+  const [isPaused, setIsPaused] = React.useState(true); // Start paused
 
   const layers: LayerType[] = ["colors", "postures", "notes", "movement", "coverage"];
+
+  // Timer effect
+  React.useEffect(() => {
+    if (!isPaused && currentTime < 300) {
+      const interval = setInterval(() => {
+        setCurrentTime((t) => Math.min(t + 1, 300));
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [isPaused, currentTime]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -93,14 +108,23 @@ const Index = () => {
       case "notes":
         return <StaticNotes />;
       case "movement":
-        return <DynamicMovement />;
+        return <DynamicMovement currentTime={currentTime} />;
       case "coverage":
-        return <DynamicCoverage />;
+        return <DynamicCoverage currentTime={currentTime} />;
     }
   };
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
+      {/* Timer at top center */}
+      <div className="max-w-7xl mx-auto mb-6 flex justify-center">
+        <Timer
+          currentTime={currentTime}
+          isPaused={isPaused}
+          onTogglePause={() => setIsPaused(!isPaused)}
+        />
+      </div>
+
       {/* Header controls */}
       <div className="max-w-7xl mx-auto mb-8 space-y-4">
         <div className="flex flex-wrap gap-4 items-center justify-between">
