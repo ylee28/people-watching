@@ -10,6 +10,7 @@ import { UnifiedNotes } from "@/components/layers/UnifiedNotes";
 import { UnifiedMovement } from "@/components/layers/UnifiedMovement";
 import { UnifiedCoverage } from "@/components/layers/UnifiedCoverage";
 import { Timer } from "@/components/Timer";
+import { TimelineControls } from "@/components/TimelineControls";
 import { usePeoplePlaybackStore, startPlaybackTicker } from "@/lib/usePeoplePlaybackStore";
 
 type ViewMode = "intro" | "stack" | "focus";
@@ -116,13 +117,16 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
-      {/* Timer at top center */}
-      <div className="max-w-7xl mx-auto mb-6 flex justify-center">
-        <Timer
-          currentTime={timeSec}
-          isPlaying={isPlaying}
-          onTogglePause={() => (isPlaying ? pause() : play())}
-        />
+      {/* Timer and timeline controls at top center */}
+      <div className="max-w-7xl mx-auto mb-6 space-y-4">
+        <div className="flex justify-center">
+          <Timer
+            currentTime={timeSec}
+            isPlaying={isPlaying}
+            onTogglePause={() => (isPlaying ? pause() : play())}
+          />
+        </div>
+        <TimelineControls />
       </div>
 
       {/* Header controls */}
@@ -320,7 +324,7 @@ const Index = () => {
                   if (introMode === "overlapped") {
                     yOffset = 0; // All perfectly overlapped
                   } else if (introMode === "exploded") {
-                    yOffset = idx * 60; // Increased spacing for better click targets
+                    yOffset = idx * 72; // 72px spacing for no overlap
                     shadow = "0 6px 12px rgba(0,0,0,0.08)";
                   } else if (introMode === "tilted") {
                     yOffset = idx * 48;

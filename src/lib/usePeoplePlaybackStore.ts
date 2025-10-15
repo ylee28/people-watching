@@ -15,6 +15,7 @@ export interface TimelinePoint {
   action: string;
   angleDeg: number;
   radiusFactor: number;
+  duration?: number; // optional, for path segments
 }
 
 export interface TimelinePerson {
@@ -33,6 +34,7 @@ export interface PersonState extends PersonBase {
 interface PeoplePlaybackStore {
   timeSec: number;
   isPlaying: boolean;
+  speed: number; // playback speed multiplier
   peopleBase: PersonBase[];
   timeline: TimelinePerson[];
   peopleAtTime: PersonState[];
@@ -41,8 +43,9 @@ interface PeoplePlaybackStore {
   play: () => void;
   pause: () => void;
   setTime: (t: number) => void;
+  setSpeed: (speed: number) => void;
   loadData: () => Promise<void>;
-  tick: () => void;
+  tick: (deltaTime: number) => void;
   computePeopleAtTime: () => void;
 }
 
@@ -78,9 +81,118 @@ const getPathHistory = (track: TimelinePoint[], t: number) => {
     .map((p) => ({ angleDeg: p.angleDeg, radiusFactor: p.radiusFactor, t: p.t }));
 };
 
+// Timeline augmentation: add procedural movements to make the scene more dynamic
+const augmentTimeline = (timeline: TimelinePerson[]): TimelinePerson[] => {
+  const augmented = timeline.map((person) => ({ ...person, track: [...person.track] }));
+  
+  // Rim runners: P06, P07, P09 - 2 full clockwise laps between t=150-270s
+  const rimRunners = ['P06', 'P07', 'P09'];
+  rimRunners.forEach((id, idx) => {
+    const person = augmented.find((p) => p.id === id);
+    if (!person) return;
+    
+    const startAngle = idx * 120; // Spread 120° apart
+    const lapDuration = 60; // 60s per lap
+    
+    // Remove existing events in this range if any
+    person.track = person.track.filter((p) => p.t < 150 || p.t > 270);
+    
+    // Add lap events
+    person.track.push(
+      { t: 150, action: 'stand', angleDeg: startAngle, radiusFactor: 0.92 },
+      { t: 150 + lapDuration * 0.25, action: 'walk', angleDeg: startAngle + 90, radiusFactor: 0.92 },
+      { t: 150 + lapDuration * 0.5, action: 'walk', angleDeg: startAngle + 180, radiusFactor: 0.92 },
+      { t: 150 + lapDuration * 0.75, action: 'walk', angleDeg: startAngle + 270, radiusFactor: 0.92 },
+      { t: 150 + lapDuration, action: 'walk', angleDeg: startAngle + 360, radiusFactor: 0.92 },
+      // Second lap
+      { t: 210 + lapDuration * 0.25, action: 'walk', angleDeg: startAngle + 450, radiusFactor: 0.92 },
+      { t: 210 + lapDuration * 0.5, action: 'walk', angleDeg: startAngle + 540, radiusFactor: 0.92 },
+      { t: 210 + lapDuration * 0.75, action: 'walk', angleDeg: startAngle + 630, radiusFactor: 0.92 },
+      { t: 270, action: 'walk', angleDeg: startAngle + 720, radiusFactor: 0.92 },
+    );
+    
+    person.track.sort((a, b) => a.t - b.t);
+  });
+  
+  // Wide sweepers: P03, P05 - figure-eight sweeps between t=120-240s
+  const wideSweepers = ['P03', 'P05'];
+  wideSweepers.forEach((id, idx) => {
+    const person = augmented.find((p) => p.id === id);
+    if (!person) return;
+    
+    const baseAngle = idx * 180; // 0° and 180°
+    
+    person.track = person.track.filter((p) => p.t < 120 || p.t > 240);
+    
+    // Two figure-eight cycles
+    for (let cycle = 0; cycle < 2; cycle++) {
+      const tBase = 120 + cycle * 60;
+      person.track.push(
+        { t: tBase, action: 'stand', angleDeg: baseAngle, radiusFactor: 0.92 },
+        { t: tBase + 15, action: 'walk', angleDeg: baseAngle + 45, radiusFactor: 0.55 },
+        { t: tBase + 30, action: 'walk', angleDeg: baseAngle + 90, radiusFactor: 0.92 },
+        { t: tBase + 45, action: 'walk', angleDeg: baseAngle + 180, radiusFactor: 0.55 },
+        { t: tBase + 60, action: 'walk', angleDeg: baseAngle + 270, radiusFactor: 0.92 },
+      );
+    }
+    
+    person.track.sort((a, b) => a.t - b.t);
+  });
+  
+  // Center drifters: P12, P13 - spiral out from center between t=160-230s
+  const centerDrifters = ['P12', 'P13'];
+  centerDrifters.forEach((id, idx) => {
+    const person = augmented.find((p) => p.id === id);
+    if (!person) return;
+    
+    const baseAngle = idx * 180;
+    
+    person.track = person.track.filter((p) => p.t < 160 || p.t > 230);
+    
+    // Spiral out
+    const steps = 8;
+    for (let i = 0; i <= steps; i++) {
+      const t = 160 + (i / steps) * 70;
+      const r = 0.25 + (0.55 / steps) * i;
+      const angle = baseAngle + (360 / steps) * i;
+      person.track.push({
+        t: Math.round(t),
+        action: i === 0 ? 'stand' : 'walk',
+        angleDeg: angle,
+        radiusFactor: r,
+      });
+    }
+    
+    person.track.sort((a, b) => a.t - b.t);
+  });
+  
+  // Enforce exits at t=300s for specified people
+  const exitIds = ['P02', 'P03', 'P05', 'P06', 'P07', 'P08', 'P09', 'P10', 'P12', 'P13'];
+  exitIds.forEach((id) => {
+    const person = augmented.find((p) => p.id === id);
+    if (!person) return;
+    
+    // Remove any existing exit
+    person.track = person.track.filter((p) => p.action !== 'exit');
+    
+    // Add walk to exit at 0° then exit
+    const lastNonExit = person.track[person.track.length - 1] || { t: 290, angleDeg: 0, radiusFactor: 0.92 };
+    
+    if (lastNonExit.t < 290) {
+      person.track.push({ t: 290, action: 'walk', angleDeg: 10, radiusFactor: 0.92 });
+    }
+    
+    person.track.push({ t: 300, action: 'exit', angleDeg: 0, radiusFactor: 0.92 });
+    person.track.sort((a, b) => a.t - b.t);
+  });
+  
+  return augmented;
+};
+
 export const usePeoplePlaybackStore = create<PeoplePlaybackStore>((set, get) => ({
   timeSec: 0,
   isPlaying: false,
+  speed: 1,
   peopleBase: [],
   timeline: [],
   peopleAtTime: [],
@@ -99,11 +211,15 @@ export const usePeoplePlaybackStore = create<PeoplePlaybackStore>((set, get) => 
     get().computePeopleAtTime();
   },
 
-  tick: () => {
-    const { timeSec, isPlaying } = get();
+  setSpeed: (speed: number) => {
+    set({ speed });
+  },
+
+  tick: (deltaTime: number) => {
+    const { timeSec, isPlaying, speed } = get();
     if (!isPlaying) return;
     
-    const newTime = Math.min(timeSec + 1, 300);
+    const newTime = Math.min(timeSec + deltaTime * speed, 300);
     set({ timeSec: newTime });
     
     if (newTime >= 300) {
@@ -121,7 +237,10 @@ export const usePeoplePlaybackStore = create<PeoplePlaybackStore>((set, get) => 
       ]);
       
       const peopleBase: PersonBase[] = await peopleRes.json();
-      const timeline: TimelinePerson[] = await timelineRes.json();
+      let timeline: TimelinePerson[] = await timelineRes.json();
+      
+      // Augment timeline with procedural movements
+      timeline = augmentTimeline(timeline);
       
       set({ peopleBase, timeline });
       get().computePeopleAtTime();
@@ -181,20 +300,33 @@ export const usePeoplePlaybackStore = create<PeoplePlaybackStore>((set, get) => 
   },
 }));
 
-// Start the tick interval (call this once in the app)
-let tickInterval: number | null = null;
+// Start the tick with requestAnimationFrame (call this once in the app)
+let rafId: number | null = null;
+let lastTickTime: number | null = null;
 
 export const startPlaybackTicker = () => {
-  if (tickInterval) return;
+  if (rafId) return;
   
-  tickInterval = window.setInterval(() => {
-    usePeoplePlaybackStore.getState().tick();
-  }, 1000);
+  const tick = (timestamp: number) => {
+    if (lastTickTime === null) {
+      lastTickTime = timestamp;
+    }
+    
+    const deltaTime = (timestamp - lastTickTime) / 1000; // Convert to seconds
+    lastTickTime = timestamp;
+    
+    usePeoplePlaybackStore.getState().tick(deltaTime);
+    
+    rafId = requestAnimationFrame(tick);
+  };
+  
+  rafId = requestAnimationFrame(tick);
 };
 
 export const stopPlaybackTicker = () => {
-  if (tickInterval) {
-    clearInterval(tickInterval);
-    tickInterval = null;
+  if (rafId) {
+    cancelAnimationFrame(rafId);
+    rafId = null;
+    lastTickTime = null;
   }
 };
