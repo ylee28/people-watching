@@ -1,5 +1,4 @@
 import * as React from "react";
-
 interface TimerProps {
   currentTime: number; // seconds (0-300)
   isPlaying: boolean;
@@ -13,35 +12,18 @@ interface TimerProps {
 export const Timer: React.FC<TimerProps> = ({
   currentTime,
   isPlaying,
-  onTogglePause,
+  onTogglePause
 }) => {
   const minutes = Math.floor(currentTime / 60);
   const seconds = Math.floor(currentTime % 60);
   const display = `${minutes}:${String(seconds).padStart(2, "0")}`;
-
   const isComplete = currentTime >= 300;
-
-  return (
-    <div className="text-center">
-      <button
-        onClick={onTogglePause}
-        className="text-4xl font-mono font-bold px-6 py-3 rounded-lg transition-all hover:scale-105 bg-background border-2 border-border shadow-lg"
-        aria-label={!isPlaying ? "Resume timer" : "Pause timer"}
-        disabled={isComplete}
-      >
-        {isComplete ? (
-          <span className="text-primary">Train arrived</span>
-        ) : (
-          <span className={!isPlaying ? "text-muted-foreground" : "text-foreground"}>
+  return <div className="text-center">
+      <button onClick={onTogglePause} className="text-4xl font-mono font-bold px-6 py-3 rounded-lg transition-all hover:scale-105 bg-background border-2 border-border shadow-lg" aria-label={!isPlaying ? "Resume timer" : "Pause timer"} disabled={isComplete}>
+        {isComplete ? <span className="text-primary">Train arrived</span> : <span className={!isPlaying ? "text-muted-foreground" : "text-foreground"}>
             {display}
-          </span>
-        )}
+          </span>}
       </button>
-      {!isComplete && (
-        <p className="text-xs text-muted-foreground mt-2">
-          {!isPlaying ? "Paused - Click to resume" : "Click to pause"}
-        </p>
-      )}
-    </div>
-  );
+      {!isComplete}
+    </div>;
 };
