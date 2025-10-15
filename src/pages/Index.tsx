@@ -264,8 +264,8 @@ const Index = () => {
                 const ovalHeight = circleDiameter * 0.22; // 114.4px
                 const ellipseScaleY = 0.22; // vertical squash factor
                 
-                // Responsive gap based on screen width
-                const gap = windowWidth >= 1280 ? 96 : windowWidth >= 1024 ? 72 : 48;
+                // Fixed 5px gap between ovals
+                const gap = 5;
                 
                 let yOffset = 0;
                 let containerHeight = circleDiameter;
