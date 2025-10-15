@@ -20,14 +20,14 @@ export const CircularGrid: React.FC<CircularGridProps> = ({
   const center = size / 2;
   const maxRadius = size / 2 - 20; // padding
 
-  // Bench arc definitions: updated layout (T1/T2 top, B1/B2 bottom, R right, L left)
+  // Bench arc definitions: [centerAngle, ±18°]
   const benches = [
-    { label: "T1", center: 126, color: "#2ecc71" },  // 108-144° top-left
-    { label: "T2", center: 90, color: "#3498db" },   // 72-108° top-right
-    { label: "R", center: 18, color: "#e74c3c" },    // 0-36° right
-    { label: "L", center: 198, color: "#f39c12" },   // 180-216° left
-    { label: "B1", center: 270, color: "#9b59b6" },  // 252-288° bottom-left
-    { label: "B2", center: 306, color: "#1abc9c" },  // 288-324° bottom-right
+    { label: "R", center: 0, color: "#e74c3c" },
+    { label: "T2", center: 72, color: "#3498db" },
+    { label: "T1", center: 108, color: "#2ecc71" },
+    { label: "L", center: 180, color: "#f39c12" },
+    { label: "B1", center: 252, color: "#9b59b6" },
+    { label: "B2", center: 288, color: "#1abc9c" },
   ];
 
   const benchRadius = maxRadius * 0.92;
