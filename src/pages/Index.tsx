@@ -4,12 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { StaticColors } from "@/components/layers/StaticColors";
-import { StaticPostures } from "@/components/layers/StaticPostures";
-import { StaticNotes } from "@/components/layers/StaticNotes";
-import { DynamicMovement } from "@/components/layers/DynamicMovement";
-import { DynamicCoverage } from "@/components/layers/DynamicCoverage";
+import { UnifiedColors } from "@/components/layers/UnifiedColors";
+import { UnifiedPostures } from "@/components/layers/UnifiedPostures";
+import { UnifiedNotes } from "@/components/layers/UnifiedNotes";
+import { UnifiedMovement } from "@/components/layers/UnifiedMovement";
+import { UnifiedCoverage } from "@/components/layers/UnifiedCoverage";
 import { Timer } from "@/components/Timer";
+import { usePeoplePlaybackStore, startPlaybackTicker } from "@/lib/usePeoplePlaybackStore";
 
 type ViewMode = "intro" | "stack" | "focus";
 type IntroMode = "overlapped" | "exploded" | "tilted";
@@ -34,21 +35,16 @@ const Index = () => {
   const [introStyleOpacity, setIntroStyleOpacity] = React.useState(30);
   const [introStylePosition, setIntroStylePosition] = React.useState<"above" | "below">("below");
   
-  // Timer state
-  const [currentTime, setCurrentTime] = React.useState(0); // 0-300 seconds
-  const [isPaused, setIsPaused] = React.useState(true); // Start paused
+  // Zustand store
+  const { timeSec, isPlaying, play, pause, loadData } = usePeoplePlaybackStore();
 
   const layers: LayerType[] = ["colors", "postures", "notes", "movement", "coverage"];
 
-  // Timer effect
+  // Load data and start ticker on mount
   React.useEffect(() => {
-    if (!isPaused && currentTime < 300) {
-      const interval = setInterval(() => {
-        setCurrentTime((t) => Math.min(t + 1, 300));
-      }, 1000);
-      return () => clearInterval(interval);
-    }
-  }, [isPaused, currentTime]);
+    loadData();
+    startPlaybackTicker();
+  }, [loadData]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -102,15 +98,15 @@ const Index = () => {
   const renderLayer = (layer: LayerType) => {
     switch (layer) {
       case "colors":
-        return <StaticColors />;
+        return <UnifiedColors />;
       case "postures":
-        return <StaticPostures />;
+        return <UnifiedPostures />;
       case "notes":
-        return <StaticNotes />;
+        return <UnifiedNotes />;
       case "movement":
-        return <DynamicMovement currentTime={currentTime} />;
+        return <UnifiedMovement />;
       case "coverage":
-        return <DynamicCoverage currentTime={currentTime} />;
+        return <UnifiedCoverage />;
     }
   };
 
@@ -119,9 +115,9 @@ const Index = () => {
       {/* Timer at top center */}
       <div className="max-w-7xl mx-auto mb-6 flex justify-center">
         <Timer
-          currentTime={currentTime}
-          isPaused={isPaused}
-          onTogglePause={() => setIsPaused(!isPaused)}
+          currentTime={timeSec}
+          isPlaying={isPlaying}
+          onTogglePause={() => (isPlaying ? pause() : play())}
         />
       </div>
 

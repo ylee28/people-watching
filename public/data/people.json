@@ -1,0 +1,119 @@
+[
+  {
+    "id": "p01",
+    "angleDeg": 5,
+    "radiusFactor": 0.92,
+    "bench": "R",
+    "color": "#3498db",
+    "posture": "upright",
+    "words": "blue coat, quiet"
+  },
+  {
+    "id": "p02",
+    "angleDeg": 10,
+    "radiusFactor": 0.92,
+    "bench": "R",
+    "color": "#2ecc71",
+    "posture": "leaning",
+    "words": "hands folded, calm"
+  },
+  {
+    "id": "p03",
+    "angleDeg": 60,
+    "radiusFactor": 0.92,
+    "bench": "T2",
+    "color": "#e74c3c",
+    "posture": "curled",
+    "words": "reading book"
+  },
+  {
+    "id": "p04",
+    "angleDeg": 75,
+    "radiusFactor": 0.92,
+    "bench": "T2",
+    "color": "#f39c12",
+    "posture": "phone",
+    "words": "checking watch often"
+  },
+  {
+    "id": "p05",
+    "angleDeg": 85,
+    "radiusFactor": 0.92,
+    "bench": "T1",
+    "color": "#9b59b6",
+    "posture": "reading",
+    "words": "newspaper intently"
+  },
+  {
+    "id": "p06",
+    "angleDeg": 100,
+    "radiusFactor": 0.92,
+    "bench": "T1",
+    "color": "#1abc9c",
+    "posture": "upright",
+    "words": "waiting patiently"
+  },
+  {
+    "id": "p07",
+    "angleDeg": 115,
+    "radiusFactor": 0.92,
+    "bench": "T1",
+    "color": "#e67e22",
+    "posture": "leaning",
+    "words": "looking around"
+  },
+  {
+    "id": "p08",
+    "angleDeg": 170,
+    "radiusFactor": 0.92,
+    "bench": "L",
+    "color": "#95a5a6",
+    "posture": "curled",
+    "words": "resting eyes"
+  },
+  {
+    "id": "p09",
+    "angleDeg": 190,
+    "radiusFactor": 0.92,
+    "bench": "L",
+    "color": "#34495e",
+    "posture": "phone",
+    "words": "texting quickly"
+  },
+  {
+    "id": "p10",
+    "angleDeg": 245,
+    "radiusFactor": 0.92,
+    "bench": "B1",
+    "color": "#c0392b",
+    "posture": "reading",
+    "words": "holding coffee"
+  },
+  {
+    "id": "p11",
+    "angleDeg": 260,
+    "radiusFactor": 0.92,
+    "bench": "B2",
+    "color": "#27ae60",
+    "posture": "upright",
+    "words": "backpack on lap"
+  },
+  {
+    "id": "p12",
+    "angleDeg": 150,
+    "radiusFactor": 0.40,
+    "bench": "CENTER",
+    "color": "#3498db",
+    "posture": "stand",
+    "words": "standing near center"
+  },
+  {
+    "id": "p13",
+    "angleDeg": 270,
+    "radiusFactor": 0.35,
+    "bench": "CENTER",
+    "color": "#f39c12",
+    "posture": "stand",
+    "words": "looking at phone"
+  }
+]
