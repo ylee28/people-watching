@@ -356,11 +356,7 @@ const Index = () => {
             }} />}
               </div>
 
-              {introMode === "overlapped" && <p className="text-center text-sm text-muted-foreground">
-                  Click the circle to explode layers
-                </p>}
-              {introMode === "exploded" && <p className="text-center text-sm text-muted-foreground">
-                  Click a layer to view • Click background or press Esc to collapse
+        
                 </p>}
             </motion.div>}
 
