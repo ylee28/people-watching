@@ -19,9 +19,9 @@ type CSVSample = {
   motion?: string;
 };
 
-const DWELL_DEFAULT_DIAMETER_PX = 5;  // diameter while MOVING
-const DWELL_GROW_DIAM_PER_SEC = 3;   // +3 px diameter per second while STILL
-const STROKE_WIDTH_PX = 2;           // ring stroke width (solid)
+const DWELL_DEFAULT_DIAM_PX = 10;   // diameter for MOVING intervals
+const DWELL_GROW_DIAM_PER_SEC = 10; // +10px/sec while STILL
+const DWELL_STROKE_WIDTH = 2;
 
 // Module-level persistent state
 const dwellState = new Map<string, DwellState>();
@@ -84,20 +84,23 @@ function updateDwell(
   let s = dwellState.get(personId);
   
   if (!s) {
-    s = { ringDiameterPx: DWELL_DEFAULT_DIAMETER_PX };
+    s = { ringDiameterPx: DWELL_DEFAULT_DIAM_PX };
   }
 
-  // If we entered a new interval, reset to default diameter
+  // On new interval, initialize baseline for MOVING; keep continuity across consecutive STILL intervals
   if (s.intervalKey !== key) {
     s.intervalKey = key;
-    s.ringDiameterPx = DWELL_DEFAULT_DIAMETER_PX;
+    if (im.motion === 'MOVING') {
+      s.ringDiameterPx = DWELL_DEFAULT_DIAM_PX;
+    }
+    // If STILL, do not reset here; allow growth to continue across back-to-back STILL intervals
   }
 
-  // Within this interval, apply growth or hold
+  // Apply per-interval rule
   if (im.motion === 'STILL') {
-    s.ringDiameterPx += DWELL_GROW_DIAM_PER_SEC * dtSec; // +3 px diameter per second (unbounded)
-  } else {
-    s.ringDiameterPx = DWELL_DEFAULT_DIAMETER_PX; // fixed at 5px while MOVING
+    s.ringDiameterPx += DWELL_GROW_DIAM_PER_SEC * dtSec; // unbounded growth
+  } else { // MOVING
+    s.ringDiameterPx = DWELL_DEFAULT_DIAM_PX;            // fixed size during MOVING
   }
 
   dwellState.set(personId, s);
@@ -105,7 +108,7 @@ function updateDwell(
 
 /**
  * Layer 2: Dwell Time - Shows growing rings around stationary people
- * Rings start at 5px diameter and grow at +3px/sec when motion=STILL, fixed at 5px when motion=MOVING
+ * MOVING → 10px diameter (fixed), STILL → grows +10px/sec (unbounded, continuous across STILL intervals)
  */
 export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
   const peopleAtTime = usePeoplePlaybackStore((state) => state.peopleAtTime);
@@ -175,7 +178,7 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
               );
 
               const state = dwellState.get(person.id);
-              const ringDiameter = state?.ringDiameterPx || DWELL_DEFAULT_DIAMETER_PX;
+              const ringDiameter = state?.ringDiameterPx || DWELL_DEFAULT_DIAM_PX;
               const ringRadius = ringDiameter / 2;
 
               if (ringRadius <= 0) return null;
@@ -188,7 +191,7 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
                   r={ringRadius}
                   fill="none"
                   stroke={person.color}
-                  strokeWidth={STROKE_WIDTH_PX}
+                  strokeWidth={DWELL_STROKE_WIDTH}
                   strokeOpacity="0.9"
                 />
               );
