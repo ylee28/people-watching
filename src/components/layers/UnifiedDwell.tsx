@@ -9,17 +9,27 @@ interface UnifiedDwellProps {
 }
 
 interface DwellState {
-  lastPos?: { angleDeg: number; radiusFactor: number };
+  last: { angleDeg: number; radiusFactor: number } | null;
   dwellSec: number;
-  ringRadius: number;
-  lastUpdateTime: number;
+  ringRadiusPx: number;
+  moving: boolean;
 }
 
-const ANGLE_TOLERANCE = 2.0; // degrees
-const RADIUS_TOLERANCE = 0.015; // radiusFactor
-const BASE_RADIUS = 6; // px
-const MAX_RADIUS_FOCUS = 36; // px
-const GROWTH_RATE = 0.9; // px/s
+const ANGLE_EPS = 2.0; // degrees
+const RADIUS_EPS = 0.015; // radiusFactor units
+const DOT_RADIUS_PX = 6;
+const GROWTH_RATE_PX_PER_SEC = 1.0;
+const RING_MAX_PX = 36;
+
+/**
+ * Calculate shortest angular distance (signed, wrap-aware)
+ */
+const shortestAngularDistance = (a: number, b: number): number => {
+  let diff = a - b;
+  while (diff > 180) diff -= 360;
+  while (diff < -180) diff += 360;
+  return diff;
+};
 
 /**
  * Layer 2: Dwell Time - Shows growing rings around stationary people
@@ -46,49 +56,61 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
       peopleAtTime
         .filter((person) => person.isVisible)
         .forEach((person) => {
-          const currentPos = {
+          const curr = {
             angleDeg: person.currentAngleDeg,
             radiusFactor: person.currentRadiusFactor
           };
           
           const state = next.get(person.id) || {
+            last: null,
             dwellSec: 0,
-            ringRadius: 0,
-            lastUpdateTime: timeSec
+            ringRadiusPx: DOT_RADIUS_PX,
+            moving: false
           };
           
-          // Check if stationary
-          let isStationary = false;
-          if (state.lastPos) {
-            const angleDiff = Math.abs(currentPos.angleDeg - state.lastPos.angleDeg);
-            const radiusDiff = Math.abs(currentPos.radiusFactor - state.lastPos.radiusFactor);
-            
-            // Handle angle wrap
-            const normalizedAngleDiff = Math.min(angleDiff, 360 - angleDiff);
-            
-            isStationary = normalizedAngleDiff <= ANGLE_TOLERANCE && radiusDiff <= RADIUS_TOLERANCE;
+          let isMoving = false;
+          
+          if (state.last !== null) {
+            const dAngle = shortestAngularDistance(curr.angleDeg, state.last.angleDeg);
+            const dRadius = Math.abs(curr.radiusFactor - state.last.radiusFactor);
+            isMoving = Math.abs(dAngle) > ANGLE_EPS || dRadius > RADIUS_EPS;
           }
           
-          if (isStationary) {
-            // Grow
-            const newDwellSec = state.dwellSec + dt;
-            const targetRadius = Math.min(BASE_RADIUS + GROWTH_RATE * newDwellSec, MAX_RADIUS_FOCUS);
-            
-            next.set(person.id, {
-              lastPos: currentPos,
-              dwellSec: newDwellSec,
-              ringRadius: targetRadius,
-              lastUpdateTime: timeSec
-            });
+          // Detect movement state change
+          const movementStarted = !state.moving && isMoving;
+          const becameStill = state.moving && !isMoving;
+          
+          let newDwellSec = state.dwellSec;
+          let newRingRadiusPx = state.ringRadiusPx;
+          
+          if (movementStarted) {
+            // Movement started: reset dwell and shrink to dot
+            newDwellSec = 0;
+            newRingRadiusPx = DOT_RADIUS_PX;
+          } else if (isMoving) {
+            // Still moving: keep at dot radius
+            newDwellSec = 0;
+            newRingRadiusPx = DOT_RADIUS_PX;
           } else {
-            // Moving - shrink
-            next.set(person.id, {
-              lastPos: currentPos,
-              dwellSec: 0,
-              ringRadius: 0,
-              lastUpdateTime: timeSec
-            });
+            // Still (or became still): accumulate and grow
+            newDwellSec += dt;
+            newRingRadiusPx = Math.min(
+              RING_MAX_PX,
+              DOT_RADIUS_PX + GROWTH_RATE_PX_PER_SEC * newDwellSec
+            );
           }
+          
+          // Check for exit
+          if (person.currentRadiusFactor > 1.0) {
+            newRingRadiusPx = 0; // Shrink on exit
+          }
+          
+          next.set(person.id, {
+            last: curr,
+            dwellSec: newDwellSec,
+            ringRadiusPx: newRingRadiusPx,
+            moving: isMoving
+          });
         });
       
       // Remove states for people no longer visible
@@ -120,9 +142,9 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
                 );
                 
                 const state = dwellStates.get(person.id);
-                const ringRadius = state?.ringRadius || 0;
+                const ringRadius = state?.ringRadiusPx || DOT_RADIUS_PX;
 
-                if (ringRadius < BASE_RADIUS) return null;
+                if (ringRadius <= 0) return null;
 
                 return (
                   <motion.circle
@@ -132,13 +154,12 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
                     r={ringRadius}
                     fill="none"
                     stroke={person.color}
-                    strokeWidth="2.5"
+                    strokeWidth="2"
                     strokeOpacity="0.9"
-                    strokeDasharray="8 6"
-                    initial={{ r: 0, opacity: 0 }}
-                    animate={{ r: ringRadius, opacity: 0.9 }}
+                    initial={{ r: DOT_RADIUS_PX }}
+                    animate={{ r: ringRadius }}
                     exit={{ r: 0, opacity: 0 }}
-                    transition={{ duration: 0.3, ease: "easeOut" }}
+                    transition={{ duration: 0.12, ease: "easeOut" }}
                   />
                 );
               })}

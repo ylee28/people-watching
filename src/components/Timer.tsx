@@ -19,15 +19,20 @@ export const Timer: React.FC<TimerProps> = ({
   const { durationSec } = usePeoplePlaybackStore();
   const isComplete = currentTime >= durationSec;
   
-  // Wall-clock: 4:56:00 PM to 4:59:00 PM
-  const start = { h: 16, m: 56, s: 0 }; // 4:56:00 PM
-  const t = Math.min(currentTime, durationSec);
-  const totalStartSec = start.h * 3600 + start.m * 60 + start.s;
-  const wall = totalStartSec + t;
-  const hh = Math.floor(wall / 3600) % 24;
+  // Wall-clock: 4:56:00 PM to 4:59:00 PM (integer seconds only)
+  const t = Math.min(durationSec, Math.max(0, currentTime));
+  const tInt = Math.floor(t); // Ensure NO decimals
+  
+  const start = { h: 16, m: 56, s: 0 }; // 4:56:00 PM in 24h
+  const wall = (start.h * 3600 + start.m * 60 + start.s) + tInt;
+  
+  const hh24 = Math.floor(wall / 3600) % 24;
   const mm = Math.floor((wall % 3600) / 60);
   const ss = wall % 60;
-  const display = `${((hh % 12) || 12)}:${mm.toString().padStart(2,'0')}:${ss.toString().padStart(2,'0')} ${hh >= 12 ? 'PM' : 'AM'}`;
+  
+  const hh12 = (hh24 % 12) || 12;
+  const ampm = hh24 >= 12 ? 'PM' : 'AM';
+  const display = `${hh12}:${mm.toString().padStart(2,'0')}:${ss.toString().padStart(2,'0')} ${ampm}`;
   
   return (
     <div className="text-center">
