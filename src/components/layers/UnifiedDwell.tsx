@@ -14,9 +14,9 @@ interface DwellState {
 
 const ANGLE_EPS = 0.5; // degrees
 const RADIUS_EPS = 0.002; // radiusFactor units
-const DEFAULT_DIAMETER_PX = 2;
-const DEFAULT_RADIUS_PX = DEFAULT_DIAMETER_PX / 2; // = 1px
-const GROW_RADIUS_PER_SEC = 0.5; // +1px diameter per second = +0.5px radius per second
+const DEFAULT_DIAMETER_PX = 5;
+const DEFAULT_RADIUS_PX = DEFAULT_DIAMETER_PX / 2; // = 2.5px
+const GROW_RADIUS_PER_SEC = 1.5; // +3px diameter per second = +1.5px radius per second
 
 /**
  * Calculate shortest angular distance (wrap-aware)
@@ -28,7 +28,7 @@ const shortestAngularDelta = (a: number, b: number): number => {
 
 /**
  * Layer 2: Dwell Time - Shows growing rings around stationary people
- * Rings grow at 1px diameter/sec when position doesn't change, snap to 2px diameter when moving
+ * Rings grow at 3px diameter/sec when position doesn't change, snap to 5px diameter when moving
  */
 export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
   const peopleAtTime = usePeoplePlaybackStore((state) => state.peopleAtTime);
@@ -91,10 +91,10 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
             const SAME = dAng <= ANGLE_EPS && dRad <= RADIUS_EPS;
             
             if (SAME) {
-              // Position unchanged: grow at +0.5px radius per second (unbounded)
+              // Position unchanged: grow at +1.5px radius per second (unbounded)
               state.ringRadiusPx += GROW_RADIUS_PER_SEC * dtSec;
             } else {
-              // Position changed: snap back to default immediately (2px diameter = 1px radius)
+              // Position changed: snap back to default immediately (5px diameter = 2.5px radius)
               state.ringRadiusPx = DEFAULT_RADIUS_PX;
             }
             
