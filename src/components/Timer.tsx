@@ -25,7 +25,7 @@ export const Timer: React.FC = () => {
   
   return (
     <div className="text-center pointer-events-none">
-      <span className="text-base md:text-lg font-medium text-foreground">
+      <span style={{ fontSize: '225pt' }} className="font-medium text-foreground">
         {isComplete ? "Train arrived" : display}
       </span>
     </div>

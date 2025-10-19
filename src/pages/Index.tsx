@@ -21,7 +21,7 @@ const layerLabels: Record<LayerType, string> = {
   dwell: "Dwell Time",
   notes: "Notes",
   movement: "Path",
-  coverage: "Coverage"
+  coverage: "Item"
 };
 const Index = () => {
   const [viewMode, setViewMode] = React.useState<ViewMode>("intro");
@@ -114,9 +114,9 @@ const Index = () => {
       case "notes":
         return <UnifiedNotes />;
       case "movement":
-        return <UnifiedMovement />;
+        return <UnifiedColors />;
       case "coverage":
-        return <UnifiedCoverage />;
+        return <UnifiedColors />;
     }
   };
   return <div className="min-h-screen bg-background p-4 md:p-8">
@@ -232,11 +232,14 @@ const Index = () => {
               zIndex: 0
             }} />}
 
-                {/* Circular click area for overlapped state */}
-                {introMode === "overlapped" && <div className="absolute inset-0 m-auto cursor-pointer" style={{
+                {/* Circular click area for overlapped state - full circle clickable */}
+                {introMode === "overlapped" && <div className="absolute cursor-pointer" style={{
               width: 520,
               height: 520,
               borderRadius: "50%",
+              left: '50%',
+              top: '50%',
+              transform: 'translate(-50%, -50%)',
               zIndex: 10
             }} onClick={handleIntroClick} role="button" tabIndex={0} onKeyDown={e => e.key === "Enter" && handleIntroClick()} aria-label="Click to explode layers" />}
 
@@ -269,12 +272,11 @@ const Index = () => {
                   containerHeight = ovalHeight;
                 }
                 
-                // Label position for exploded view - 300px to the left, vertically centered
+                // Label position for exploded view - 300px to the left of leftmost edge, 600px vertical spacing
                 const labelStyle = introMode === "exploded" ? {
                   position: 'absolute' as const,
-                  left: -300,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
+                  left: -(ovalWidth / 2 + 300),
+                  top: idx * 600,
                   fontSize: '14px',
                   fontWeight: 500,
                   whiteSpace: 'nowrap' as const,
