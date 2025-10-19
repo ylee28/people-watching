@@ -12,7 +12,7 @@ interface DwellState {
   lastIntervalKey?: string;
 }
 
-type Sample = { tSec: number; angleDeg?: number; radiusFactor?: number };
+type Sample = { tSec: number; angleDeg?: number; radiusFactor?: number; motion?: string };
 
 const DEFAULT_DIAM_PX = 5;
 const GROW_DIAM_PER_SEC = 3; // +3px diameter/sec
@@ -87,15 +87,23 @@ function updateDwellForPerson(
 
   const intervalKey = `${A.tSec}-${B.tSec}`;
 
-  // Classify THIS 10s window once (no per-frame flips)
-  const aA = A.angleDeg ?? 0;
-  const rA = A.radiusFactor ?? 0;
-  const aB = B.angleDeg ?? 0;
-  const rB = B.radiusFactor ?? 0;
+  // Check if motion column is present and not blank
+  let INTERVAL_STILL: boolean;
+  
+  if (A.motion && A.motion !== '') {
+    // Use explicit motion column if present
+    INTERVAL_STILL = A.motion === 'STILL';
+  } else {
+    // Fall back to comparing angleDeg/radiusFactor with tolerances
+    const aA = A.angleDeg ?? 0;
+    const rA = A.radiusFactor ?? 0;
+    const aB = B.angleDeg ?? 0;
+    const rB = B.radiusFactor ?? 0;
 
-  const dAng = Math.abs(shortestAngularDelta(aA, aB));
-  const dRad = Math.abs(rB - rA);
-  const INTERVAL_STILL = dAng <= ANGLE_EPS && dRad <= RADIUS_EPS;
+    const dAng = Math.abs(shortestAngularDelta(aA, aB));
+    const dRad = Math.abs(rB - rA);
+    INTERVAL_STILL = dAng <= ANGLE_EPS && dRad <= RADIUS_EPS;
+  }
 
   // If we just entered a new MOVING interval, reset diameter to default
   if (s.lastIntervalKey !== intervalKey && !INTERVAL_STILL) {
@@ -130,13 +138,24 @@ function debugDwell(dtSec: number, tSec: number, csvPositions: Record<string, Sa
 
     const dAng = Math.abs(shortestAngularDelta(aA, aB));
     const dRad = Math.abs(rB - rA);
-    const still = dAng <= ANGLE_EPS && dRad <= RADIUS_EPS;
+    
+    let still: boolean;
+    let motionSource: string;
+    
+    if (A.motion && A.motion !== '') {
+      still = A.motion === 'STILL';
+      motionSource = `motion=${A.motion}`;
+    } else {
+      still = dAng <= ANGLE_EPS && dRad <= RADIUS_EPS;
+      motionSource = 'calculated';
+    }
 
     console.log('[Dwell][P01]', {
       tSec: tSec.toFixed(1),
       dAng: dAng.toFixed(3),
       dRad: dRad.toFixed(4),
       still: still,
+      motionSource: motionSource,
       diameter: d.ringDiameterPx.toFixed(2),
       interval: `${A.tSec}-${B.tSec}`,
       angles: `${aA.toFixed(1)} → ${aB.toFixed(1)}`,

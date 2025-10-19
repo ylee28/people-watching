@@ -16,6 +16,7 @@ export interface CSVSample {
   radiusFactor?: number;
   bench?: string;
   notes?: string;
+  motion?: string;
 }
 
 export interface TimelinePoint {
@@ -386,6 +387,10 @@ export const usePeoplePlaybackStore = create<PeoplePlaybackStore>((set, get) => 
         
         if (row.notes) {
           sample.notes = row.notes;
+        }
+        
+        if (row.motion) {
+          sample.motion = row.motion;
         }
         
         if (!csvPositions[personId]) {
