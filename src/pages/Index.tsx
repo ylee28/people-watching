@@ -269,10 +269,10 @@ const Index = () => {
                   containerHeight = ovalHeight;
                 }
                 
-                // Label position for exploded view - 100px to the left, vertically centered
+                // Label position for exploded view - 300px to the left, vertically centered
                 const labelStyle = introMode === "exploded" ? {
                   position: 'absolute' as const,
-                  left: -100,
+                  left: -300,
                   top: '50%',
                   transform: 'translateY(-50%)',
                   fontSize: '14px',
