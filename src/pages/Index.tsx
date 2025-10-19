@@ -393,10 +393,7 @@ const Index = () => {
 
       {/* Keyboard shortcuts help */}
       <div className="max-w-7xl mx-auto mt-8 text-center text-xs text-muted-foreground">
-        <p>
-          Keyboard: <kbd className="px-2 py-1 bg-muted rounded">Enter</kbd> to open,{" "}
-          <kbd className="px-2 py-1 bg-muted rounded">Esc</kbd> to go back
-        </p>
+        
       </div>
     </div>;
 };
