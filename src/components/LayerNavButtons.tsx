@@ -30,7 +30,21 @@ export const LayerNavButtons: React.FC<LayerNavButtonsProps> = ({
       {layers.map(layer => {
       const isActive = activeLayer === layer;
       const gradient = layerColors[layer];
-      return;
+      return (
+        <motion.button
+          key={layer}
+          onClick={() => onSelect(layer)}
+          className={`px-4 py-2 rounded-lg font-medium transition-all ${
+            isActive
+              ? `bg-gradient-to-r ${gradient} text-white shadow-lg`
+              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+          }`}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          {layerLabels[layer]}
+        </motion.button>
+      );
     })}
     </div>;
 };
