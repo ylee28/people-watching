@@ -355,9 +355,6 @@ const Index = () => {
               zIndex: 20
             }} />}
               </div>
-
-        
-                </p>}
             </motion.div>}
 
           {/* FOCUS VIEW - Single layer full circle */}
