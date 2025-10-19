@@ -10,7 +10,8 @@ interface UnifiedDwellProps {
 interface DwellState {
   dwellSec: number;
   ringPx: number;
-  tween?: { from: number; to: number; t: number; dur: number };
+  shrinkTween?: { from: number; to: number; t: number; dur: number };
+  lastSeenTick?: number;
 }
 
 const ANGLE_EPS = 0.5; // degrees (tight tolerance for CSV rounding)
@@ -38,124 +39,138 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
   const timeSec = usePeoplePlaybackStore((state) => state.timeSec);
   const csvPositions = usePeoplePlaybackStore((state) => state.csvPositions);
   
-  const [dwellStates, setDwellStates] = React.useState<Map<string, DwellState>>(new Map());
-  const prevTimeRef = React.useRef<number>(0);
+  // Persistent state that survives renders
+  const dwellStatesRef = React.useRef<Map<string, DwellState>>(new Map());
   const rafRef = React.useRef<number>(0);
   const lastFrameTimeRef = React.useRef<number>(performance.now());
+  const prevTimeSecRef = React.useRef<number>(0);
+  const [, forceUpdate] = React.useState({});
   
   const center = size / 2;
   const maxRadius = size / 2 - 20;
 
-  // Use requestAnimationFrame for smooth animations
+  // Reset on time jump (rewind)
+  React.useEffect(() => {
+    const dt = timeSec - prevTimeSecRef.current;
+    if (dt <= 0 || dt > 1) {
+      // Time jumped backwards or skipped - reset all states
+      dwellStatesRef.current.clear();
+      forceUpdate({});
+    }
+    prevTimeSecRef.current = timeSec;
+  }, [timeSec]);
+
+  // Main animation loop
   React.useEffect(() => {
     const animate = (now: number) => {
-      const dtSec = (now - lastFrameTimeRef.current) / 1000;
+      const dtSec = Math.max(0, (now - lastFrameTimeRef.current) / 1000);
       lastFrameTimeRef.current = now;
       
       if (dtSec > 0 && dtSec < 0.1) {
-        setDwellStates((prev) => {
-          const next = new Map(prev);
-          
-          peopleAtTime
-            .filter((person) => person.isVisible)
-            .forEach((person) => {
-              const state = next.get(person.id) || {
+        const dwellStates = dwellStatesRef.current;
+        
+        peopleAtTime
+          .filter((person) => person.isVisible)
+          .forEach((person) => {
+            // Get or create persistent state
+            let state = dwellStates.get(person.id);
+            if (!state) {
+              state = {
                 dwellSec: 0,
                 ringPx: DOT_PX
               };
-              
-              // Determine if the current interval is STILL or MOVING
-              let intervalStill = false;
-              
-              if (csvPositions) {
-                const samples = csvPositions[person.id];
-                if (samples && samples.length > 0) {
-                  // Find bracketing samples A and B
-                  let sampleA = null;
-                  let sampleB = null;
-                  
-                  for (let i = 0; i < samples.length - 1; i++) {
-                    if (samples[i].tSec <= timeSec && samples[i + 1].tSec > timeSec) {
-                      sampleA = samples[i];
-                      sampleB = samples[i + 1];
-                      break;
-                    }
+              dwellStates.set(person.id, state);
+            }
+            
+            // Determine if the current interval is STILL or MOVING
+            // Use bracketing CSV samples A and B
+            let intervalStill = false;
+            
+            if (csvPositions) {
+              const samples = csvPositions[person.id];
+              if (samples && samples.length > 0) {
+                // Find bracketing samples A and B
+                let sampleA = null;
+                let sampleB = null;
+                
+                for (let i = 0; i < samples.length - 1; i++) {
+                  if (samples[i].tSec <= timeSec && samples[i + 1].tSec > timeSec) {
+                    sampleA = samples[i];
+                    sampleB = samples[i + 1];
+                    break;
                   }
-                  
-                  // If at or past last sample, use last sample as both A and B
-                  if (!sampleA && samples.length > 0) {
-                    const lastSample = samples[samples.length - 1];
-                    if (timeSec >= lastSample.tSec) {
-                      sampleA = lastSample;
-                      sampleB = lastSample;
-                    }
+                }
+                
+                // If at or past last sample, use last sample as both A and B
+                if (!sampleA && samples.length > 0) {
+                  const lastSample = samples[samples.length - 1];
+                  if (timeSec >= lastSample.tSec) {
+                    sampleA = lastSample;
+                    sampleB = lastSample;
                   }
+                }
+                
+                if (sampleA && sampleB) {
+                  const aA = sampleA.angleDeg ?? 0;
+                  const rA = sampleA.radiusFactor ?? 0;
+                  const aB = sampleB.angleDeg ?? 0;
+                  const rB = sampleB.radiusFactor ?? 0;
                   
-                  if (sampleA && sampleB) {
-                    const aA = sampleA.angleDeg ?? 0;
-                    const rA = sampleA.radiusFactor ?? 0;
-                    const aB = sampleB.angleDeg ?? 0;
-                    const rB = sampleB.radiusFactor ?? 0;
-                    
-                    const dAng = Math.abs(shortestAngularDelta(aA, aB));
-                    const dRad = Math.abs(rB - rA);
-                    
-                    intervalStill = dAng <= ANGLE_EPS && dRad <= RADIUS_EPS;
-                  }
+                  const dAng = Math.abs(shortestAngularDelta(aA, aB));
+                  const dRad = Math.abs(rB - rA);
+                  
+                  intervalStill = dAng <= ANGLE_EPS && dRad <= RADIUS_EPS;
                 }
               }
-              
-              // Check for exit
-              const isExiting = person.currentRadiusFactor > 1.0;
-              
-              let newState = { ...state };
-              
-              if (isExiting) {
-                // Exiting: shrink to 0 with tween
-                newState.dwellSec = 0;
-                if (!newState.tween || newState.tween.to !== 0) {
-                  newState.tween = { from: newState.ringPx, to: 0, t: 0, dur: 0.12 };
-                }
-                if (newState.tween) {
-                  newState.tween.t = Math.min(newState.tween.t + dtSec, newState.tween.dur);
-                  const k = newState.tween.t / newState.tween.dur;
-                  const e = 1 - Math.pow(1 - k, 3); // easeOutCubic
-                  newState.ringPx = newState.tween.from + (newState.tween.to - newState.tween.from) * e;
-                }
-              } else if (!intervalStill) {
-                // INTERVAL_MOVING: start/maintain shrink tween to DOT_PX
-                newState.dwellSec = 0;
-                if (!newState.tween || newState.tween.to !== DOT_PX) {
-                  newState.tween = { from: newState.ringPx, to: DOT_PX, t: 0, dur: 0.12 };
-                }
-                if (newState.tween) {
-                  newState.tween.t = Math.min(newState.tween.t + dtSec, newState.tween.dur);
-                  const k = newState.tween.t / newState.tween.dur;
-                  const e = 1 - Math.pow(1 - k, 3); // easeOutCubic
-                  newState.ringPx = newState.tween.from + (newState.tween.to - newState.tween.from) * e;
-                }
-              } else {
-                // INTERVAL_STILL: cancel tween and grow without bound
-                newState.tween = undefined;
-                newState.dwellSec += dtSec;
-                const target = DOT_PX + GROWTH_RATE_PX_PER_SEC * newState.dwellSec;
-                // Light smoothing to prevent jitter
-                newState.ringPx += (target - newState.ringPx) * 0.3;
+            }
+            
+            // Check for exit
+            const isExiting = person.currentRadiusFactor > 1.0;
+            
+            if (isExiting) {
+              // Exiting: shrink to 0 with tween
+              state.dwellSec = 0;
+              if (!state.shrinkTween || state.shrinkTween.to !== 0) {
+                state.shrinkTween = { from: state.ringPx, to: 0, t: 0, dur: 0.12 };
               }
-              
-              next.set(person.id, newState);
-            });
-          
-          // Remove states for people no longer visible
-          const visibleIds = new Set(peopleAtTime.filter(p => p.isVisible).map(p => p.id));
-          Array.from(next.keys()).forEach(id => {
-            if (!visibleIds.has(id)) {
-              next.delete(id);
+              if (state.shrinkTween) {
+                state.shrinkTween.t = Math.min(state.shrinkTween.t + dtSec, state.shrinkTween.dur);
+                const k = state.shrinkTween.t / state.shrinkTween.dur;
+                const easeOutCubic = (x: number) => 1 - Math.pow(1 - x, 3);
+                state.ringPx = state.shrinkTween.from + (state.shrinkTween.to - state.shrinkTween.from) * easeOutCubic(k);
+              }
+            } else if (!intervalStill) {
+              // INTERVAL_MOVING: start/maintain shrink tween to DOT_PX
+              state.dwellSec = 0;
+              if (!state.shrinkTween || state.shrinkTween.to !== DOT_PX) {
+                state.shrinkTween = { from: state.ringPx, to: DOT_PX, t: 0, dur: 0.12 };
+              }
+              if (state.shrinkTween) {
+                state.shrinkTween.t = Math.min(state.shrinkTween.t + dtSec, state.shrinkTween.dur);
+                const k = state.shrinkTween.t / state.shrinkTween.dur;
+                const easeOutCubic = (x: number) => 1 - Math.pow(1 - x, 3);
+                state.ringPx = state.shrinkTween.from + (state.shrinkTween.to - state.shrinkTween.from) * easeOutCubic(k);
+              }
+            } else {
+              // INTERVAL_STILL: cancel tween and grow without bound
+              state.shrinkTween = undefined;
+              state.dwellSec += dtSec;
+              const target = DOT_PX + GROWTH_RATE_PX_PER_SEC * state.dwellSec; // unlimited growth
+              // Light smoothing to prevent jitter
+              state.ringPx += (target - state.ringPx) * 0.3;
             }
           });
-          
-          return next;
+        
+        // Remove states for people no longer visible
+        const visibleIds = new Set(peopleAtTime.filter(p => p.isVisible).map(p => p.id));
+        Array.from(dwellStates.keys()).forEach(id => {
+          if (!visibleIds.has(id)) {
+            dwellStates.delete(id);
+          }
         });
+        
+        // Force re-render to show updated rings
+        forceUpdate({});
       }
       
       rafRef.current = requestAnimationFrame(animate);
@@ -169,17 +184,6 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
       }
     };
   }, [timeSec, peopleAtTime, csvPositions]);
-
-  // Reset on time jump
-  React.useEffect(() => {
-    const dt = timeSec - prevTimeRef.current;
-    prevTimeRef.current = timeSec;
-    
-    if (dt <= 0 || dt > 1) {
-      // Reset on time jump
-      setDwellStates(new Map());
-    }
-  }, [timeSec]);
 
   return (
     <div className="relative" style={{ width: size, height: size }}>
@@ -196,7 +200,7 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
                 person.currentAngleDeg
               );
               
-              const state = dwellStates.get(person.id);
+              const state = dwellStatesRef.current.get(person.id);
               const ringRadius = state?.ringPx || DOT_PX;
 
               if (ringRadius <= 0) return null;
