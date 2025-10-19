@@ -8,13 +8,12 @@ interface UnifiedDwellProps {
 }
 
 interface DwellState {
-  ringRadiusPx: number;
-  dwellSec: number; // accumulate time while STILL
+  ringDiameterPx: number;
+  lastIntervalKey?: string;
 }
 
-const DEFAULT_DIAMETER_PX = 5;
-const DEFAULT_RADIUS_PX = DEFAULT_DIAMETER_PX / 2; // 2.5px
-const GROW_RADIUS_PER_SEC = 1.5; // +3px diameter/sec = +1.5px radius/sec
+const DEFAULT_DIAM_PX = 5;
+const GROW_DIAM_PER_SEC = 3; // +3px diameter/sec = +1.5px radius/sec
 const ANGLE_EPS = 0.5; // degrees
 const RADIUS_EPS = 0.002; // radiusFactor
 
@@ -22,21 +21,18 @@ const RADIUS_EPS = 0.002; // radiusFactor
  * Calculate shortest angular distance (wrap-aware)
  */
 function shortestAngularDelta(a: number, b: number): number {
-  let diff = a - b;
-  while (diff > 180) diff -= 360;
-  while (diff < -180) diff += 360;
-  return diff;
+  return ((b - a + 540) % 360) - 180; // (-180, 180]
 }
 
 // Module-level persistent state (survives renders)
-const dwellMap = new Map<string, DwellState>();
+const dwellStore = new Map<string, DwellState>();
 let rafId: number | null = null;
-let lastTime = performance.now();
+let lastNow = performance.now();
 let debugTimer = 0;
 
 /**
  * Layer 2: Dwell Time - Shows growing rings around stationary people
- * Rings grow when the CSV keyframe interval shows no position change
+ * Rings grow at +3px diameter/sec when keyframe A == keyframe B (INTERVAL_STILL)
  */
 export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
   const peopleAtTime = usePeoplePlaybackStore((state) => state.peopleAtTime);
@@ -47,11 +43,11 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
   const center = size / 2;
   const maxRadius = size / 2 - 20;
 
-  // Main animation loop - interval-based detection
+  // Main animation loop - interval-based detection (A vs B keyframes)
   React.useEffect(() => {
     function loop(now = performance.now()) {
-      const dtSec = Math.max(0, (now - lastTime) / 1000);
-      lastTime = now;
+      const dtSec = Math.max(0, (now - lastNow) / 1000);
+      lastNow = now;
       
       if (dtSec > 0 && dtSec < 0.1) {
         // Update all dwell states
@@ -61,80 +57,82 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
           // Check for exit
           const isExiting = person.currentRadiusFactor > 1.0;
           if (isExiting) {
-            const state = dwellMap.get(person.id);
+            const state = dwellStore.get(person.id);
             if (state) {
-              state.ringRadiusPx = DEFAULT_RADIUS_PX;
-              state.dwellSec = 0;
+              state.ringDiameterPx = DEFAULT_DIAM_PX;
             }
             return;
           }
           
-          // Get or create state
-          let state = dwellMap.get(person.id);
-          if (!state) {
-            state = { ringRadiusPx: DEFAULT_RADIUS_PX, dwellSec: 0 };
-            dwellMap.set(person.id, state);
-          }
+          // Get bracketing CSV samples A and B
+          if (!csvPositions) return;
           
-          // Determine if the INTERVAL is STILL or MOVING
-          // Compare the current CSV keyframe to the next CSV keyframe
-          let intervalStill = false;
+          const samples = csvPositions[person.id];
+          if (!samples || samples.length === 0) return;
           
-          if (csvPositions) {
-            const samples = csvPositions[person.id];
-            if (samples && samples.length > 0) {
-              // Find bracketing samples A (current interval) and B (next interval)
-              let sampleA = null;
-              let sampleB = null;
-              
-              for (let i = 0; i < samples.length - 1; i++) {
-                if (samples[i].tSec <= timeSec && samples[i + 1].tSec > timeSec) {
-                  sampleA = samples[i];
-                  sampleB = samples[i + 1];
-                  break;
-                }
-              }
-              
-              // If at or past last sample, use last sample as both A and B
-              if (!sampleA && samples.length > 0) {
-                const lastSample = samples[samples.length - 1];
-                if (timeSec >= lastSample.tSec) {
-                  sampleA = lastSample;
-                  sampleB = lastSample;
-                }
-              }
-              
-              if (sampleA && sampleB) {
-                const aA = sampleA.angleDeg ?? 0;
-                const rA = sampleA.radiusFactor ?? 0;
-                const aB = sampleB.angleDeg ?? 0;
-                const rB = sampleB.radiusFactor ?? 0;
-                
-                const dAng = Math.abs(shortestAngularDelta(aA, aB));
-                const dRad = Math.abs(rB - rA);
-                
-                // INTERVAL_STILL: current keyframe == next keyframe
-                intervalStill = dAng <= ANGLE_EPS && dRad <= RADIUS_EPS;
-              }
+          let sampleA = null;
+          let sampleB = null;
+          
+          for (let i = 0; i < samples.length - 1; i++) {
+            if (samples[i].tSec <= timeSec && samples[i + 1].tSec > timeSec) {
+              sampleA = samples[i];
+              sampleB = samples[i + 1];
+              break;
             }
           }
           
-          if (intervalStill) {
-            // STILL: position same in current and next interval → GROW
-            state.dwellSec += dtSec;
-            state.ringRadiusPx = DEFAULT_RADIUS_PX + GROW_RADIUS_PER_SEC * state.dwellSec;
+          // If at or past last sample, use last sample as both A and B
+          if (!sampleA && samples.length > 0) {
+            const lastSample = samples[samples.length - 1];
+            if (timeSec >= lastSample.tSec) {
+              sampleA = lastSample;
+              sampleB = lastSample;
+            }
+          }
+          
+          if (!sampleA || !sampleB) return;
+          
+          const tA = sampleA.tSec;
+          const tB = sampleB.tSec;
+          const intervalKey = `${tA}-${tB}`;
+          
+          const aA = sampleA.angleDeg ?? 0;
+          const rA = sampleA.radiusFactor ?? 0;
+          const aB = sampleB.angleDeg ?? 0;
+          const rB = sampleB.radiusFactor ?? 0;
+          
+          const dAng = Math.abs(shortestAngularDelta(aA, aB));
+          const dRad = Math.abs(rB - rA);
+          
+          const INTERVAL_STILL = dAng <= ANGLE_EPS && dRad <= RADIUS_EPS;
+          
+          // Get or create state
+          let state = dwellStore.get(person.id);
+          if (!state) {
+            state = { ringDiameterPx: DEFAULT_DIAM_PX };
+            dwellStore.set(person.id, state);
+          }
+          
+          // Reset ring when interval changes and moving
+          if (state.lastIntervalKey !== intervalKey && !INTERVAL_STILL) {
+            state.ringDiameterPx = DEFAULT_DIAM_PX;
+          }
+          state.lastIntervalKey = intervalKey;
+          
+          if (INTERVAL_STILL) {
+            // STILL: A == B → grow continuously for entire interval
+            state.ringDiameterPx += GROW_DIAM_PER_SEC * dtSec;
           } else {
-            // MOVING: position different in current vs next interval → snap to default
-            state.ringRadiusPx = DEFAULT_RADIUS_PX;
-            state.dwellSec = 0;
+            // MOVING: A != B → snap to default for entire interval
+            state.ringDiameterPx = DEFAULT_DIAM_PX;
           }
         });
         
         // Remove states for people no longer visible
         const visibleIds = new Set(activePeople.map(p => p.id));
-        Array.from(dwellMap.keys()).forEach(id => {
+        Array.from(dwellStore.keys()).forEach(id => {
           if (!visibleIds.has(id)) {
-            dwellMap.delete(id);
+            dwellStore.delete(id);
           }
         });
         
@@ -153,18 +151,17 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
                   break;
                 }
               }
-              const s = dwellMap.get('P01');
+              const s = dwellStore.get('P01');
               if (s && sampleA && sampleB) {
                 const dAng = Math.abs(shortestAngularDelta(sampleA.angleDeg ?? 0, sampleB.angleDeg ?? 0));
                 const dRad = Math.abs((sampleA.radiusFactor ?? 0) - (sampleB.radiusFactor ?? 0));
                 const still = dAng <= ANGLE_EPS && dRad <= RADIUS_EPS;
                 console.log('[Dwell] P01', {
-                  ring: s.ringRadiusPx.toFixed(2),
-                  intervalStill: still,
+                  diameter: s.ringDiameterPx.toFixed(2),
+                  INTERVAL_STILL: still,
                   dAng: dAng.toFixed(3),
                   dRad: dRad.toFixed(4),
-                  tA: sampleA.tSec,
-                  tB: sampleB.tSec
+                  interval: `${sampleA.tSec}-${sampleB.tSec}`
                 });
               }
             }
@@ -206,8 +203,9 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
                 person.currentAngleDeg
               );
               
-              const state = dwellMap.get(person.id);
-              const ringRadius = state?.ringRadiusPx || DEFAULT_RADIUS_PX;
+              const state = dwellStore.get(person.id);
+              const ringDiameter = state?.ringDiameterPx || DEFAULT_DIAM_PX;
+              const ringRadius = ringDiameter / 2;
 
               if (ringRadius <= 0) return null;
 
