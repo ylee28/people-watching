@@ -12,6 +12,7 @@ import { UnifiedCoverage } from "@/components/layers/UnifiedCoverage";
 import { Timer } from "@/components/Timer";
 import { TimelineControls } from "@/components/TimelineControls";
 import { LayerNavButtons } from "@/components/LayerNavButtons";
+import { CSVUploader } from "@/components/CSVUploader";
 import { usePeoplePlaybackStore, startPlaybackTicker } from "@/lib/usePeoplePlaybackStore";
 type ViewMode = "intro" | "focus";
 type IntroMode = "overlapped" | "exploded";
@@ -134,7 +135,9 @@ const Index = () => {
       {/* Header controls */}
       <div className="max-w-7xl mx-auto mb-8 space-y-4">
         <div className="flex flex-wrap gap-4 items-center justify-between">
-          <div className="flex gap-2">
+          <div className="flex gap-4 items-center">
+            <CSVUploader />
+            <div className="flex gap-2">
             <Button variant={viewMode === "intro" ? "default" : "outline"} onClick={() => {
             setViewMode("intro");
             setIntroMode("overlapped");
@@ -147,6 +150,7 @@ const Index = () => {
             {introMode === "exploded" && viewMode === "intro" && <Button variant="outline" onClick={handleBackgroundClick} size="sm">
                 Back to Overlapped
               </Button>}
+            </div>
           </div>
 
           {/* Intro Style Reference (Intro only) */}

@@ -1,6 +1,8 @@
 import * as React from "react";
+import { usePeoplePlaybackStore } from "@/lib/usePeoplePlaybackStore";
+
 interface TimerProps {
-  currentTime: number; // seconds (0-300)
+  currentTime: number;
   isPlaying: boolean;
   onTogglePause: () => void;
 }
@@ -14,10 +16,11 @@ export const Timer: React.FC<TimerProps> = ({
   isPlaying,
   onTogglePause
 }) => {
+  const { durationSec } = usePeoplePlaybackStore();
   const minutes = Math.floor(currentTime / 60);
   const seconds = Math.floor(currentTime % 60);
   const display = `${minutes}:${String(seconds).padStart(2, "0")}`;
-  const isComplete = currentTime >= 300;
+  const isComplete = currentTime >= durationSec;
   return <div className="text-center">
       <button onClick={onTogglePause} className="text-4xl font-mono font-bold px-6 py-3 rounded-lg transition-all hover:scale-105 bg-background border-2 border-border shadow-lg" aria-label={!isPlaying ? "Resume timer" : "Pause timer"} disabled={isComplete}>
         {isComplete ? <span className="text-primary">Train arrived</span> : <span className={!isPlaying ? "text-muted-foreground" : "text-foreground"}>

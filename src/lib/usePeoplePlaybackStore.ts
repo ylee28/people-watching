@@ -10,6 +10,14 @@ export interface PersonBase {
   words: string;
 }
 
+export interface CSVSample {
+  tSec: number;
+  angleDeg?: number;
+  radiusFactor?: number;
+  bench?: string;
+  notes?: string;
+}
+
 export interface TimelinePoint {
   t: number;
   action: string;
@@ -34,10 +42,13 @@ export interface PersonState extends PersonBase {
 interface PeoplePlaybackStore {
   timeSec: number;
   isPlaying: boolean;
-  speed: number; // playback speed multiplier
+  speed: number;
+  durationSec: number;
   peopleBase: PersonBase[];
   timeline: TimelinePerson[];
   peopleAtTime: PersonState[];
+  csvPositions: Record<string, CSVSample[]> | null;
+  peopleMeta: Record<string, { color: string; posture: string; words: string }>;
   
   // Actions
   play: () => void;
@@ -45,9 +56,49 @@ interface PeoplePlaybackStore {
   setTime: (t: number) => void;
   setSpeed: (speed: number) => void;
   loadData: () => Promise<void>;
+  loadCSVData: (csvText: string) => void;
   tick: (deltaTime: number) => void;
   computePeopleAtTime: () => void;
 }
+
+// Helper: normalize angle to [0, 360)
+const normalizeAngle = (angle: number): number => {
+  const normalized = angle % 360;
+  return normalized < 0 ? normalized + 360 : normalized;
+};
+
+// Helper: shortest angular distance (handles 360° wrap)
+const shortestAngleDist = (from: number, to: number): number => {
+  const diff = to - from;
+  const normalized = ((diff + 180) % 360) - 180;
+  return normalized < -180 ? normalized + 360 : normalized;
+};
+
+// Helper: interpolate position between two CSV samples
+const interpolateCSVPosition = (before: CSVSample, after: CSVSample, t: number) => {
+  if (before.tSec === after.tSec) return before;
+  
+  const ratio = (t - before.tSec) / (after.tSec - before.tSec);
+  
+  let angleDeg = before.angleDeg;
+  if (before.angleDeg !== undefined && after.angleDeg !== undefined) {
+    const dist = shortestAngleDist(before.angleDeg, after.angleDeg);
+    angleDeg = normalizeAngle(before.angleDeg + dist * ratio);
+  }
+  
+  let radiusFactor = before.radiusFactor;
+  if (before.radiusFactor !== undefined && after.radiusFactor !== undefined) {
+    radiusFactor = before.radiusFactor + (after.radiusFactor - before.radiusFactor) * ratio;
+  }
+  
+  return {
+    tSec: t,
+    angleDeg,
+    radiusFactor,
+    bench: before.bench,
+    notes: before.notes || after.notes,
+  };
+};
 
 // Helper: interpolate position between two timeline points
 const interpolatePosition = (track: TimelinePoint[], t: number) => {
@@ -226,9 +277,12 @@ export const usePeoplePlaybackStore = create<PeoplePlaybackStore>((set, get) => 
   timeSec: 0,
   isPlaying: false,
   speed: 1,
+  durationSec: 300,
   peopleBase: [],
   timeline: [],
   peopleAtTime: [],
+  csvPositions: null,
+  peopleMeta: {},
 
   play: () => {
     set({ isPlaying: true });
@@ -239,7 +293,8 @@ export const usePeoplePlaybackStore = create<PeoplePlaybackStore>((set, get) => 
   },
 
   setTime: (t: number) => {
-    const clampedTime = Math.max(0, Math.min(300, t));
+    const { durationSec } = get();
+    const clampedTime = Math.max(0, Math.min(durationSec, t));
     set({ timeSec: clampedTime });
     get().computePeopleAtTime();
   },
@@ -249,13 +304,13 @@ export const usePeoplePlaybackStore = create<PeoplePlaybackStore>((set, get) => 
   },
 
   tick: (deltaTime: number) => {
-    const { timeSec, isPlaying, speed } = get();
+    const { timeSec, isPlaying, speed, durationSec } = get();
     if (!isPlaying) return;
     
-    const newTime = Math.min(timeSec + deltaTime * speed, 300);
+    const newTime = Math.min(timeSec + deltaTime * speed, durationSec);
     set({ timeSec: newTime });
     
-    if (newTime >= 300) {
+    if (newTime >= durationSec) {
       set({ isPlaying: false });
     }
     
@@ -272,19 +327,168 @@ export const usePeoplePlaybackStore = create<PeoplePlaybackStore>((set, get) => 
       const peopleBase: PersonBase[] = await peopleRes.json();
       let timeline: TimelinePerson[] = await timelineRes.json();
       
+      // Build metadata from peopleBase
+      const peopleMeta: Record<string, { color: string; posture: string; words: string }> = {};
+      peopleBase.forEach((person) => {
+        peopleMeta[person.id] = {
+          color: person.color,
+          posture: person.posture,
+          words: person.words,
+        };
+      });
+      
       // Augment timeline with procedural movements
       timeline = augmentTimeline(timeline);
       
-      set({ peopleBase, timeline });
+      set({ peopleBase, timeline, peopleMeta });
       get().computePeopleAtTime();
     } catch (err) {
       console.error('Failed to load people data:', err);
     }
   },
 
+  loadCSVData: (csvText: string) => {
+    try {
+      const lines = csvText.trim().split('\n');
+      const headers = lines[0].split(',').map(h => h.trim());
+      
+      const csvPositions: Record<string, CSVSample[]> = {};
+      let maxTime = 0;
+      
+      // Parse CSV rows
+      for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(',').map(v => v.trim());
+        const row: Record<string, string> = {};
+        headers.forEach((h, idx) => {
+          row[h] = values[idx] || '';
+        });
+        
+        const personId = row.personId;
+        if (!personId) continue;
+        
+        const tSec = parseInt(row.tSec, 10);
+        if (isNaN(tSec)) continue;
+        
+        maxTime = Math.max(maxTime, tSec);
+        
+        const sample: CSVSample = { tSec };
+        
+        if (row.angleDeg && row.angleDeg !== '') {
+          sample.angleDeg = normalizeAngle(parseFloat(row.angleDeg));
+        }
+        
+        if (row.radiusFactor && row.radiusFactor !== '') {
+          sample.radiusFactor = parseFloat(row.radiusFactor);
+        } else if (row.bench && ['T1', 'T2', 'L', 'R', 'B1', 'B2'].includes(row.bench)) {
+          // Default radiusFactor for bench seats
+          sample.radiusFactor = 0.92;
+        }
+        
+        if (row.bench) {
+          sample.bench = row.bench;
+        }
+        
+        if (row.notes) {
+          sample.notes = row.notes;
+        }
+        
+        if (!csvPositions[personId]) {
+          csvPositions[personId] = [];
+        }
+        csvPositions[personId].push(sample);
+      }
+      
+      // Sort samples by tSec for each person
+      Object.keys(csvPositions).forEach((personId) => {
+        csvPositions[personId].sort((a, b) => a.tSec - b.tSec);
+      });
+      
+      const durationSec = maxTime;
+      set({ csvPositions, durationSec, timeSec: 0 });
+      get().computePeopleAtTime();
+    } catch (err) {
+      console.error('Failed to parse CSV:', err);
+    }
+  },
+
   computePeopleAtTime: () => {
-    const { peopleBase, timeline, timeSec } = get();
+    const { peopleBase, timeline, timeSec, csvPositions, peopleMeta } = get();
     
+    // If CSV data is loaded, use that instead of timeline
+    if (csvPositions) {
+      const peopleAtTime: PersonState[] = [];
+      
+      Object.keys(csvPositions).forEach((personId) => {
+        const samples = csvPositions[personId];
+        if (!samples || samples.length === 0) return;
+        
+        // Find bracketing samples
+        let before: CSVSample | null = null;
+        let after: CSVSample | null = null;
+        
+        for (let i = 0; i < samples.length; i++) {
+          if (samples[i].tSec <= timeSec) {
+            before = samples[i];
+          }
+          if (samples[i].tSec >= timeSec && !after) {
+            after = samples[i];
+          }
+        }
+        
+        // Person not yet visible
+        if (!before) return;
+        
+        // Check for exit
+        const isExited = before.bench === 'EXIT' || 
+                        (before.radiusFactor !== undefined && before.radiusFactor > 1.0) ||
+                        (after && (after.bench === 'EXIT' || (after.radiusFactor !== undefined && after.radiusFactor > 1.0)) && timeSec >= after.tSec);
+        
+        if (isExited) return; // Don't render exited people
+        
+        // Interpolate position
+        const interpolated = after && before.tSec !== after.tSec
+          ? interpolateCSVPosition(before, after, timeSec)
+          : before;
+        
+        if (interpolated.angleDeg === undefined || interpolated.radiusFactor === undefined) return;
+        
+        // Build path history (traveled portion)
+        const pathHistory = samples
+          .filter((s) => s.tSec <= timeSec && s.angleDeg !== undefined && s.radiusFactor !== undefined)
+          .map((s) => ({
+            angleDeg: s.angleDeg!,
+            radiusFactor: s.radiusFactor!,
+            t: s.tSec,
+          }));
+        
+        // Get metadata
+        const meta = peopleMeta[personId] || {
+          color: '#888888',
+          posture: 'standing',
+          words: '',
+        };
+        
+        peopleAtTime.push({
+          id: personId,
+          angleDeg: interpolated.angleDeg,
+          radiusFactor: interpolated.radiusFactor,
+          bench: interpolated.bench || 'CENTER',
+          color: meta.color,
+          posture: meta.posture,
+          words: interpolated.notes || meta.words,
+          currentAngleDeg: interpolated.angleDeg,
+          currentRadiusFactor: interpolated.radiusFactor,
+          currentAction: 'walk',
+          isVisible: true,
+          pathHistory,
+        });
+      });
+      
+      set({ peopleAtTime });
+      return;
+    }
+    
+    // Original timeline-based computation
     const peopleAtTime: PersonState[] = peopleBase.map((base) => {
       // Find timeline track for this person
       const track = timeline.find((t) => t.id === base.id);

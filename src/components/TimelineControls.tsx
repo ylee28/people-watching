@@ -6,7 +6,7 @@ import { usePeoplePlaybackStore } from "@/lib/usePeoplePlaybackStore";
  * TimelineControls: Scrubber and speed selector for playback control
  */
 export const TimelineControls: React.FC = () => {
-  const { timeSec, setTime } = usePeoplePlaybackStore();
+  const { timeSec, durationSec, setTime } = usePeoplePlaybackStore();
   
   return (
     <div className="w-full max-w-2xl mx-auto">
@@ -14,7 +14,7 @@ export const TimelineControls: React.FC = () => {
         value={[timeSec]}
         onValueChange={(v) => setTime(v[0])}
         min={0}
-        max={300}
+        max={durationSec}
         step={1}
         className="w-full"
       />
