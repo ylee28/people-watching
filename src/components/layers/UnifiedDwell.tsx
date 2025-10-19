@@ -81,7 +81,7 @@ function getIntervalMotion(
       const motion = normalizeMotion(samples[i].motion);
       
       if ((window as any).DEBUG_DWELL && personId === 'P01') {
-        dbg('IM', personId, { timeSec: timeSec.toFixed(1), motion, interval: `${tA}-${tB}` });
+        console.log('[DWELL] motion=', motion, 'interval=', `${tA}-${tB}`, 'person=', personId, 'timeSec=', timeSec.toFixed(1));
       }
       
       return { tA, tB, motion };
@@ -132,13 +132,17 @@ function updateDwell(
 
   // Apply per-interval rule
   if (im.motion === 'STILL') {
+    const before = s.ringDiameterPx;
     s.ringDiameterPx += DWELL_GROW_DIAM_PER_SEC * dtSec; // unbounded growth
+    if ((window as any).DEBUG_DWELL && personId === 'P01') {
+      dbg('GROW', personId, { before: before.toFixed(1), after: s.ringDiameterPx.toFixed(1), dtSec: dtSec.toFixed(4) });
+    }
   } else { // MOVING
     s.ringDiameterPx = DWELL_DEFAULT_DIAM_PX;            // fixed size during MOVING
   }
 
-  if ((window as any).DEBUG_DWELL && personId === 'P01') {
-    dbg('Draw', personId, { motion: im.motion, diam: s.ringDiameterPx.toFixed(1) });
+  if ((window as any).DEBUG_DWELL && personId === 'P01' && Math.random() < 0.1) {
+    dbg('State', personId, { motion: im.motion, diam: s.ringDiameterPx.toFixed(1), interval: key });
   }
 }
 
@@ -265,6 +269,11 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
 
               if (ringRadius <= 0) return null;
 
+              // Debug: log P01 rendering
+              if ((window as any).DEBUG_DWELL && person.id === 'P01' && Math.random() < 0.05) {
+                console.log('[DWELL] Rendering P01: diameter=', ringDiameter.toFixed(1), 'radius=', ringRadius.toFixed(1));
+              }
+
               return (
                 <circle
                   key={person.id}
@@ -275,6 +284,7 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
                   stroke={person.color}
                   strokeWidth={DWELL_STROKE_WIDTH}
                   strokeOpacity="0.9"
+                  vectorEffect="non-scaling-stroke"
                 />
               );
             })}
