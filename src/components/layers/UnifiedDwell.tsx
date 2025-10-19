@@ -16,11 +16,12 @@ const INTERVAL_EPS = 1e-6; // Epsilon to avoid edge flicker at exact boundaries
 // ====== TYPES ======
 type CSVRow = { tSec: number; motion?: string; angleDeg?: number; radiusFactor?: number; bench?: string };
 type Interval = { tA: number; tB: number; rowA: CSVRow; rowB: CSVRow; motion: 'STILL' | 'MOVING' };
-type DwellState = { lastKey?: string; diamPx: number };
+type DwellState = { lastKey?: string; diamPx: number; lastTimeSec: number };
 
 // ====== STATE (PERSISTENT) ======
 const dwellStates = new Map<string, DwellState>();
 let csvNormalized = false;
+let lastFrameTime = 0;
 
 // ====== HELPERS ======
 function normMotion(m?: string): 'STILL' | 'MOVING' {
@@ -77,7 +78,7 @@ function updateDwell(personId: string, timeSec: number, dtSec: number, map: Reco
   if (!iv) return;
   
   const key = `${iv.tA}-${iv.tB}`;
-  const s = dwellStates.get(personId) ?? { diamPx: DWELL_DEFAULT_DIAM };
+  const s = dwellStates.get(personId) ?? { diamPx: DWELL_DEFAULT_DIAM, lastTimeSec: timeSec };
 
   if (s.lastKey !== key) {
     s.lastKey = key;
@@ -85,7 +86,7 @@ function updateDwell(personId: string, timeSec: number, dtSec: number, map: Reco
     // if STILL, do not reset; continue growth across STILL→STILL
     
     if (personId === 'P01') {
-      dlog('🔄 ENTER interval', personId, { key, motion: iv.motion, diam: s.diamPx.toFixed(1) });
+      dlog('🔄 ENTER interval', personId, { key, motion: iv.motion, diam: s.diamPx.toFixed(1), timeSec: timeSec.toFixed(2) });
     }
   }
 
@@ -93,16 +94,17 @@ function updateDwell(personId: string, timeSec: number, dtSec: number, map: Reco
   if (iv.motion === 'STILL') {
     s.diamPx += DWELL_GROW_DIAM_PER_SEC * dtSec;
     if (personId === 'P01') {
-      dlog('📈 GROW', personId, { diam: s.diamPx.toFixed(1), dtSec: dtSec.toFixed(4) });
+      dlog('📈 GROW', personId, { diam: s.diamPx.toFixed(1), dtSec: dtSec.toFixed(4), timeSec: timeSec.toFixed(2) });
     }
   } else {
     s.diamPx = DWELL_DEFAULT_DIAM;
   }
 
+  s.lastTimeSec = timeSec;
   dwellStates.set(personId, s);
 
-  if (personId === 'P01' && Math.random() < 0.05) {
-    dlog('🎯 State', personId, { motion: iv.motion, radius: (s.diamPx / 2).toFixed(1), diam: s.diamPx.toFixed(1), interval: key });
+  if (personId === 'P01' && Math.random() < 0.02) {
+    dlog('🎯 State', personId, { motion: iv.motion, radius: (s.diamPx / 2).toFixed(1), diam: s.diamPx.toFixed(1), interval: key, timeSec: timeSec.toFixed(2) });
   }
 }
 
@@ -118,12 +120,11 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
   const peopleAtTime = usePeoplePlaybackStore((state) => state.peopleAtTime);
   const timeSec = usePeoplePlaybackStore((state) => state.timeSec);
   const csvPositions = usePeoplePlaybackStore((state) => state.csvPositions);
-  const [, forceUpdate] = React.useState({});
 
   const center = size / 2;
   const maxRadius = size / 2 - 20;
 
-  // Setup dev helpers and visual probe
+  // Setup dev helpers and visual probe (once)
   React.useEffect(() => {
     // Dev helpers (global)
     (window as any).jumpTo = (t: number) => {
@@ -155,65 +156,37 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
     };
   }, []);
 
-  // Main animation loop using global timeSec
+  // Update dwell states every render (driven by global timeSec changes)
   React.useEffect(() => {
-    let rafId: number | null = null;
-    let last = performance.now();
-    let secAccum = 0;
-    let probeAccum = 0;
+    if (!csvPositions || !assertCsvReady(csvPositions)) return;
 
-    const step = () => {
-      const now = performance.now();
-      const dtSec = Math.max(0, (now - last) / 1000);
-      last = now;
+    const now = timeSec;
+    const dtSec = lastFrameTime > 0 ? Math.max(0, now - lastFrameTime) : 0;
+    lastFrameTime = now;
 
-      if (!csvPositions || !assertCsvReady(csvPositions)) {
-        rafId = requestAnimationFrame(step);
-        return;
+    // Update ALL people from CSV
+    const ids = Object.keys(csvPositions);
+    
+    for (const id of ids) {
+      updateDwell(id, timeSec, dtSec, csvPositions);
+    }
+
+    // Update visual probe
+    const probeEl = document.getElementById('dwell-probe');
+    if (probeEl) {
+      const iv = getInterval('P01', timeSec, csvPositions);
+      const s = dwellStates.get('P01');
+      if (iv && s) {
+        const mm = Math.floor(timeSec / 60);
+        const ss = Math.floor(timeSec % 60);
+        probeEl.innerHTML = `<strong>P01 Debug</strong><br/>time: ${mm}:${ss.toString().padStart(2,'0')}<br/>motion: <strong>${iv.motion}</strong><br/>diam: ${s.diamPx.toFixed(1)}px<br/>interval: ${iv.tA}-${iv.tB}`;
       }
+    }
 
-      secAccum += dtSec;
-      if (secAccum >= 1 && (window as any).DEBUG_DWELL) { 
-        dlog('⏱️  dtSec~1s total =', secAccum.toFixed(3)); 
-        secAccum = 0; 
-      }
-
-      // Update ALL people from CSV
-      const ids = Object.keys(csvPositions);
-      
-      for (const id of ids) {
-        updateDwell(id, timeSec, dtSec, csvPositions);
-      }
-
-      // Update visual probe
-      probeAccum += dtSec;
-      if (probeAccum >= 0.25) {
-        probeAccum = 0;
-        const probeEl = document.getElementById('dwell-probe');
-        if (probeEl) {
-          const iv = getInterval('P01', timeSec, csvPositions);
-          const s = dwellStates.get('P01');
-          if (iv && s) {
-            const mm = Math.floor(timeSec / 60);
-            const ss = Math.floor(timeSec % 60);
-            probeEl.innerHTML = `<strong>P01 Debug</strong><br/>time: ${mm}:${ss.toString().padStart(2,'0')}<br/>motion: <strong>${iv.motion}</strong><br/>diam: ${s.diamPx.toFixed(1)}px<br/>interval: ${iv.tA}-${iv.tB}`;
-          }
-        }
-      }
-
-      // Force re-render
-      forceUpdate({});
-
-      rafId = requestAnimationFrame(step);
-    };
-
-    rafId = requestAnimationFrame(step);
-
-    return () => {
-      if (rafId) {
-        cancelAnimationFrame(rafId);
-      }
-    };
+    // Log once per second
+    if ((window as any).DEBUG_DWELL && Math.floor(timeSec) % 1 === 0 && Math.random() < 0.1) {
+      dlog('⏱️  timeSec =', timeSec.toFixed(2));
+    }
   }, [timeSec, csvPositions]);
 
   return (
