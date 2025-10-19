@@ -9,7 +9,7 @@ interface UnifiedDwellProps {
 
 interface DwellState {
   ringRadiusPx: number;
-  prev?: { angleDeg: number; radiusFactor: number };
+  dwellSec: number; // accumulate time while STILL
 }
 
 const DEFAULT_DIAMETER_PX = 5;
@@ -22,19 +22,10 @@ const RADIUS_EPS = 0.002; // radiusFactor
  * Calculate shortest angular distance (wrap-aware)
  */
 function shortestAngularDelta(a: number, b: number): number {
-  return ((b - a + 540) % 360) - 180; // (-180, 180]
-}
-
-/**
- * Check if two positions are the same (within tolerances)
- */
-function isSamePos(
-  prev: { angleDeg: number; radiusFactor: number },
-  curr: { angleDeg: number; radiusFactor: number }
-): boolean {
-  const dAng = Math.abs(shortestAngularDelta(prev.angleDeg, curr.angleDeg));
-  const dRad = Math.abs(prev.radiusFactor - curr.radiusFactor);
-  return dAng <= ANGLE_EPS && dRad <= RADIUS_EPS;
+  let diff = a - b;
+  while (diff > 180) diff -= 360;
+  while (diff < -180) diff += 360;
+  return diff;
 }
 
 // Module-level persistent state (survives renders)
@@ -45,16 +36,18 @@ let debugTimer = 0;
 
 /**
  * Layer 2: Dwell Time - Shows growing rings around stationary people
- * Rings grow at 3px diameter/sec when position doesn't change, snap to 5px diameter when moving
+ * Rings grow when the CSV keyframe interval shows no position change
  */
 export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
   const peopleAtTime = usePeoplePlaybackStore((state) => state.peopleAtTime);
+  const timeSec = usePeoplePlaybackStore((state) => state.timeSec);
+  const csvPositions = usePeoplePlaybackStore((state) => state.csvPositions);
   const [, forceUpdate] = React.useState({});
   
   const center = size / 2;
   const maxRadius = size / 2 - 20;
 
-  // Main animation loop - frame-based with performance.now()
+  // Main animation loop - interval-based detection
   React.useEffect(() => {
     function loop(now = performance.now()) {
       const dtSec = Math.max(0, (now - lastTime) / 1000);
@@ -65,19 +58,13 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
         const activePeople = peopleAtTime.filter(p => p.isVisible);
         
         activePeople.forEach((person) => {
-          const curr = {
-            angleDeg: person.currentAngleDeg,
-            radiusFactor: person.currentRadiusFactor
-          };
-          
           // Check for exit
           const isExiting = person.currentRadiusFactor > 1.0;
           if (isExiting) {
-            // Exiting: snap to default
             const state = dwellMap.get(person.id);
             if (state) {
               state.ringRadiusPx = DEFAULT_RADIUS_PX;
-              state.prev = curr;
+              state.dwellSec = 0;
             }
             return;
           }
@@ -85,23 +72,62 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
           // Get or create state
           let state = dwellMap.get(person.id);
           if (!state) {
-            state = { ringRadiusPx: DEFAULT_RADIUS_PX, prev: curr };
+            state = { ringRadiusPx: DEFAULT_RADIUS_PX, dwellSec: 0 };
             dwellMap.set(person.id, state);
-            return;
           }
           
-          // Determine if position is SAME or MOVING
-          const SAME = state.prev ? isSamePos(state.prev, curr) : true;
+          // Determine if the INTERVAL is STILL or MOVING
+          // Compare the current CSV keyframe to the next CSV keyframe
+          let intervalStill = false;
           
-          if (SAME) {
-            // GROW: always increase radius (unbounded)
-            state.ringRadiusPx += GROW_RADIUS_PER_SEC * dtSec;
+          if (csvPositions) {
+            const samples = csvPositions[person.id];
+            if (samples && samples.length > 0) {
+              // Find bracketing samples A (current interval) and B (next interval)
+              let sampleA = null;
+              let sampleB = null;
+              
+              for (let i = 0; i < samples.length - 1; i++) {
+                if (samples[i].tSec <= timeSec && samples[i + 1].tSec > timeSec) {
+                  sampleA = samples[i];
+                  sampleB = samples[i + 1];
+                  break;
+                }
+              }
+              
+              // If at or past last sample, use last sample as both A and B
+              if (!sampleA && samples.length > 0) {
+                const lastSample = samples[samples.length - 1];
+                if (timeSec >= lastSample.tSec) {
+                  sampleA = lastSample;
+                  sampleB = lastSample;
+                }
+              }
+              
+              if (sampleA && sampleB) {
+                const aA = sampleA.angleDeg ?? 0;
+                const rA = sampleA.radiusFactor ?? 0;
+                const aB = sampleB.angleDeg ?? 0;
+                const rB = sampleB.radiusFactor ?? 0;
+                
+                const dAng = Math.abs(shortestAngularDelta(aA, aB));
+                const dRad = Math.abs(rB - rA);
+                
+                // INTERVAL_STILL: current keyframe == next keyframe
+                intervalStill = dAng <= ANGLE_EPS && dRad <= RADIUS_EPS;
+              }
+            }
+          }
+          
+          if (intervalStill) {
+            // STILL: position same in current and next interval → GROW
+            state.dwellSec += dtSec;
+            state.ringRadiusPx = DEFAULT_RADIUS_PX + GROW_RADIUS_PER_SEC * state.dwellSec;
           } else {
-            // MOVE: snap back to default immediately
+            // MOVING: position different in current vs next interval → snap to default
             state.ringRadiusPx = DEFAULT_RADIUS_PX;
+            state.dwellSec = 0;
           }
-          
-          state.prev = curr;
         });
         
         // Remove states for people no longer visible
@@ -116,17 +142,31 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
         debugTimer += dtSec;
         if (debugTimer >= 1) {
           const p01 = activePeople.find(p => p.id === 'P01');
-          if (p01) {
-            const s = dwellMap.get('P01');
-            if (s && s.prev) {
-              const curr = { angleDeg: p01.currentAngleDeg, radiusFactor: p01.currentRadiusFactor };
-              const same = isSamePos(s.prev, curr);
-              console.log('[Dwell] P01', {
-                ring: s.ringRadiusPx.toFixed(2),
-                same: same,
-                dAng: Math.abs(shortestAngularDelta(s.prev.angleDeg, curr.angleDeg)).toFixed(3),
-                dRad: Math.abs(s.prev.radiusFactor - curr.radiusFactor).toFixed(4)
-              });
+          if (p01 && csvPositions) {
+            const samples = csvPositions['P01'];
+            if (samples && samples.length > 0) {
+              let sampleA = null, sampleB = null;
+              for (let i = 0; i < samples.length - 1; i++) {
+                if (samples[i].tSec <= timeSec && samples[i + 1].tSec > timeSec) {
+                  sampleA = samples[i];
+                  sampleB = samples[i + 1];
+                  break;
+                }
+              }
+              const s = dwellMap.get('P01');
+              if (s && sampleA && sampleB) {
+                const dAng = Math.abs(shortestAngularDelta(sampleA.angleDeg ?? 0, sampleB.angleDeg ?? 0));
+                const dRad = Math.abs((sampleA.radiusFactor ?? 0) - (sampleB.radiusFactor ?? 0));
+                const still = dAng <= ANGLE_EPS && dRad <= RADIUS_EPS;
+                console.log('[Dwell] P01', {
+                  ring: s.ringRadiusPx.toFixed(2),
+                  intervalStill: still,
+                  dAng: dAng.toFixed(3),
+                  dRad: dRad.toFixed(4),
+                  tA: sampleA.tSec,
+                  tB: sampleB.tSec
+                });
+              }
             }
           }
           debugTimer = 0;
@@ -149,7 +189,7 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
         rafId = null;
       }
     };
-  }, [peopleAtTime]);
+  }, [peopleAtTime, timeSec, csvPositions]);
 
   return (
     <div className="relative" style={{ width: size, height: size }}>
