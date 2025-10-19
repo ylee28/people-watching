@@ -17,16 +17,23 @@ export const Timer: React.FC<TimerProps> = ({
   onTogglePause
 }) => {
   const { durationSec } = usePeoplePlaybackStore();
-  const minutes = Math.floor(currentTime / 60);
-  const seconds = Math.floor(currentTime % 60);
-  const display = `${minutes}:${String(seconds).padStart(2, "0")}`;
   const isComplete = currentTime >= durationSec;
-  return <div className="text-center">
-      <button onClick={onTogglePause} className="text-4xl font-mono font-bold px-6 py-3 rounded-lg transition-all hover:scale-105 bg-background border-2 border-border shadow-lg" aria-label={!isPlaying ? "Resume timer" : "Pause timer"} disabled={isComplete}>
-        {isComplete ? <span className="text-primary">Train arrived</span> : <span className={!isPlaying ? "text-muted-foreground" : "text-foreground"}>
-            {display}
-          </span>}
-      </button>
-      {!isComplete}
-    </div>;
+  
+  // Wall-clock: 4:56:00 PM to 4:59:00 PM
+  const start = { h: 16, m: 56, s: 0 }; // 4:56:00 PM
+  const t = Math.min(currentTime, durationSec);
+  const totalStartSec = start.h * 3600 + start.m * 60 + start.s;
+  const wall = totalStartSec + t;
+  const hh = Math.floor(wall / 3600) % 24;
+  const mm = Math.floor((wall % 3600) / 60);
+  const ss = wall % 60;
+  const display = `${((hh % 12) || 12)}:${mm.toString().padStart(2,'0')}:${ss.toString().padStart(2,'0')} ${hh >= 12 ? 'PM' : 'AM'}`;
+  
+  return (
+    <div className="text-center pointer-events-none">
+      <span className="text-[18px] md:text-[20px] font-medium leading-none text-foreground">
+        {isComplete ? "Train arrived" : display}
+      </span>
+    </div>
+  );
 };

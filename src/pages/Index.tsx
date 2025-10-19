@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { UnifiedColors } from "@/components/layers/UnifiedColors";
-import { UnifiedPostures } from "@/components/layers/UnifiedPostures";
+import { UnifiedDwell } from "@/components/layers/UnifiedDwell";
 import { UnifiedNotes } from "@/components/layers/UnifiedNotes";
 import { UnifiedMovement } from "@/components/layers/UnifiedMovement";
 import { UnifiedCoverage } from "@/components/layers/UnifiedCoverage";
@@ -15,10 +15,10 @@ import { LayerNavButtons } from "@/components/LayerNavButtons";
 import { usePeoplePlaybackStore, startPlaybackTicker } from "@/lib/usePeoplePlaybackStore";
 type ViewMode = "intro" | "focus";
 type IntroMode = "overlapped" | "exploded";
-type LayerType = "colors" | "postures" | "notes" | "movement" | "coverage";
+type LayerType = "colors" | "dwell" | "notes" | "movement" | "coverage";
 const layerLabels: Record<LayerType, string> = {
   colors: "Colors",
-  postures: "Postures",
+  dwell: "Dwell Time",
   notes: "Notes",
   movement: "Path",
   coverage: "Coverage"
@@ -42,7 +42,7 @@ const Index = () => {
     pause,
     loadData
   } = usePeoplePlaybackStore();
-  const layers: LayerType[] = ["colors", "postures", "notes", "movement", "coverage"];
+  const layers: LayerType[] = ["colors", "dwell", "notes", "movement", "coverage"];
 
   // Load data and start ticker on mount
   React.useEffect(() => {
@@ -112,8 +112,8 @@ const Index = () => {
     switch (layer) {
       case "colors":
         return <UnifiedColors />;
-      case "postures":
-        return <UnifiedPostures />;
+      case "dwell":
+        return <UnifiedDwell />;
       case "notes":
         return <UnifiedNotes />;
       case "movement":
