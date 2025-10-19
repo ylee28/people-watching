@@ -1,26 +1,15 @@
 import * as React from "react";
 import { usePeoplePlaybackStore } from "@/lib/usePeoplePlaybackStore";
 
-interface TimerProps {
-  currentTime: number;
-  isPlaying: boolean;
-  onTogglePause: () => void;
-}
-
 /**
- * Timer: Displays count-up from 00:00 to 05:00
- * Clicking toggles pause/resume for all animations
+ * Timer: Displays count-up from 00:00 to 05:00 (display-only, no interaction)
  */
-export const Timer: React.FC<TimerProps> = ({
-  currentTime,
-  isPlaying,
-  onTogglePause
-}) => {
-  const { durationSec } = usePeoplePlaybackStore();
-  const isComplete = currentTime >= durationSec;
+export const Timer: React.FC = () => {
+  const { timeSec, durationSec } = usePeoplePlaybackStore();
+  const isComplete = timeSec >= durationSec;
   
   // Wall-clock: 4:56:00 PM to 4:59:00 PM (integer seconds only)
-  const t = Math.min(durationSec, Math.max(0, currentTime));
+  const t = Math.min(durationSec, Math.max(0, timeSec));
   const tInt = Math.floor(t); // Ensure NO decimals
   
   const start = { h: 16, m: 56, s: 0 }; // 4:56:00 PM in 24h
@@ -35,15 +24,10 @@ export const Timer: React.FC<TimerProps> = ({
   const display = `${hh12}:${mm.toString().padStart(2,'0')}:${ss.toString().padStart(2,'0')} ${ampm}`;
   
   return (
-    <div className="text-center">
-      <button 
-        onClick={onTogglePause}
-        disabled={isComplete}
-        className="text-[18px] md:text-[20px] font-medium leading-none text-foreground cursor-pointer hover:opacity-80 transition-opacity"
-        aria-label={isPlaying ? "Pause" : "Play"}
-      >
+    <div className="text-center pointer-events-none">
+      <span className="text-base md:text-lg font-medium text-foreground">
         {isComplete ? "Train arrived" : display}
-      </button>
+      </span>
     </div>
   );
 };

@@ -38,7 +38,6 @@ const getTraveledSubpath = (
  */
 export const UnifiedMovement: React.FC<UnifiedMovementProps> = ({ size = 520 }) => {
   const peopleAtTime = usePeoplePlaybackStore((state) => state.peopleAtTime);
-  const isPlaying = usePeoplePlaybackStore((state) => state.isPlaying);
   
   const [animations, setAnimations] = React.useState<Map<string, PersonAnimation>>(new Map());
   const rafRef = React.useRef<number>(0);
@@ -189,15 +188,15 @@ export const UnifiedMovement: React.FC<UnifiedMovementProps> = ({ size = 520 }) 
                   />
                 )}
 
-                {/* Moving dot (pulsing if playing) */}
+                {/* Moving dot (always pulsing when active) */}
                 <motion.circle
                   cx={currCoord.x}
                   cy={currCoord.y}
                   r="6"
                   fill={person.color}
                   opacity={opacity}
-                  animate={isPlaying && anim?.life === 'active' ? { scale: [1, 1.2, 1] } : { scale: 1 }}
-                  transition={{ repeat: isPlaying && anim?.life === 'active' ? Infinity : 0, duration: 1.5 }}
+                  animate={anim?.life === 'active' ? { scale: [1, 1.2, 1] } : { scale: 1 }}
+                  transition={{ repeat: anim?.life === 'active' ? Infinity : 0, duration: 1.5 }}
                 />
               </g>
             );

@@ -37,9 +37,6 @@ const Index = () => {
   // Zustand store
   const {
     timeSec,
-    isPlaying,
-    play,
-    pause,
     loadData
   } = usePeoplePlaybackStore();
   const layers: LayerType[] = ["colors", "dwell", "notes", "movement", "coverage"];
@@ -126,7 +123,7 @@ const Index = () => {
       {/* Timer and timeline controls at top center */}
       <div className="max-w-7xl mx-auto mb-6 space-y-4">
         <div className="flex justify-center">
-          <Timer currentTime={timeSec} isPlaying={isPlaying} onTogglePause={() => isPlaying ? pause() : play()} />
+          <Timer />
         </div>
         <TimelineControls />
       </div>

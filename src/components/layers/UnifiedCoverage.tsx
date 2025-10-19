@@ -21,7 +21,6 @@ interface PersonAnimation {
 export const UnifiedCoverage: React.FC<UnifiedCoverageProps> = ({ size = 520 }) => {
   const peopleAtTime = usePeoplePlaybackStore((state) => state.peopleAtTime);
   const timeSec = usePeoplePlaybackStore((state) => state.timeSec);
-  const isPlaying = usePeoplePlaybackStore((state) => state.isPlaying);
   
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const lastTimeRef = React.useRef<number>(0);
@@ -142,10 +141,8 @@ export const UnifiedCoverage: React.FC<UnifiedCoverageProps> = ({ size = 520 }) 
     lastTimeRef.current = timeSec;
   }, [timeSec, size]);
 
-  // Stamp footprints on canvas (only when active)
+  // Stamp footprints on canvas (only when active, continuously)
   React.useEffect(() => {
-    if (!isPlaying) return;
-    
     const canvas = canvasRef.current;
     if (!canvas) return;
     
@@ -186,7 +183,7 @@ export const UnifiedCoverage: React.FC<UnifiedCoverageProps> = ({ size = 520 }) 
         // Update last position
         lastPositionsRef.current.set(person.id, { x: coord.x, y: coord.y });
       });
-  }, [peopleAtTime, isPlaying, center, maxRadius, animations]);
+  }, [peopleAtTime, center, maxRadius, animations]);
 
   return (
     <div className="relative" style={{ width: size, height: size }}>

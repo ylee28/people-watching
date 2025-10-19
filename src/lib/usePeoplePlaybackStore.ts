@@ -275,7 +275,7 @@ const augmentTimeline = (timeline: TimelinePerson[]): TimelinePerson[] => {
 
 export const usePeoplePlaybackStore = create<PeoplePlaybackStore>((set, get) => ({
   timeSec: 0,
-  isPlaying: false,
+  isPlaying: true, // Always playing, but keep property for backwards compatibility
   speed: 1,
   durationSec: 300,
   peopleBase: [],
@@ -285,11 +285,11 @@ export const usePeoplePlaybackStore = create<PeoplePlaybackStore>((set, get) => 
   peopleMeta: {},
 
   play: () => {
-    set({ isPlaying: true });
+    // No-op, always playing
   },
 
   pause: () => {
-    set({ isPlaying: false });
+    // No-op, always playing
   },
 
   setTime: (t: number) => {
@@ -304,16 +304,13 @@ export const usePeoplePlaybackStore = create<PeoplePlaybackStore>((set, get) => 
   },
 
   tick: (deltaTime: number) => {
-    const { timeSec, isPlaying, speed, durationSec } = get();
-    if (!isPlaying) return;
+    const { timeSec, speed, durationSec } = get();
     
+    // Clamp at end, don't wrap or reset
     const newTime = Math.min(timeSec + deltaTime * speed, durationSec);
     set({ timeSec: newTime });
     
-    if (newTime >= durationSec) {
-      set({ isPlaying: false });
-    }
-    
+    // Always recompute, even at end (for rendering consistency)
     get().computePeopleAtTime();
   },
 
