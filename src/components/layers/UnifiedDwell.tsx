@@ -3,20 +3,14 @@ import { CircularGrid } from "../CircularGrid";
 import { polarToCartesian } from "@/lib/roomGeometry";
 import { usePeoplePlaybackStore } from "@/lib/usePeoplePlaybackStore";
 
-// === DEBUG SWITCH ===
-(window as any).DEBUG_DWELL = true; // set to false to silence all logs
-
-function dbg(...args: any[]) {
-  if ((window as any).DEBUG_DWELL) console.log('[DWELL]', ...args);
+// ==== 0) One switch to enable/disable logs ====
+(window as any).DEBUG_DWELL = true;
+function dlog(...args: any[]) { 
+  if ((window as any).DEBUG_DWELL) console.log('[DWELL]', ...args); 
 }
 
 interface UnifiedDwellProps {
   size?: number;
-}
-
-interface DwellState {
-  intervalKey?: string;
-  ringDiameterPx: number;
 }
 
 type CSVSample = {
@@ -24,94 +18,123 @@ type CSVSample = {
   angleDeg?: number;
   radiusFactor?: number;
   motion?: string;
+  bench?: string;
+};
+
+type IntervalMotion = { 
+  tA: number; 
+  tB: number; 
+  motion: 'STILL' | 'MOVING' 
 };
 
 const DWELL_DEFAULT_DIAM_PX = 10;   // diameter for MOVING intervals
 const DWELL_GROW_DIAM_PER_SEC = 10; // +10px/sec while STILL
 const DWELL_STROKE_WIDTH = 2;
 
-// Module-level persistent state
-const dwellState = new Map<string, DwellState>();
+type DwellState = { 
+  intervalKey?: string; 
+  ringDiameterPx: number 
+};
+
+const dwellStates = new Map<string, DwellState>();
 
 // rAF loop state
 let rafId: number | null = null;
-let lastFrameTime = performance.now();
-let rafAccum = 0; // for periodic dtSec logging
+let lastNow = performance.now();
+let rafAccum = 0;
+let csvReadinessChecked = false;
 
-/**
- * Normalize motion field to 'STILL' | 'MOVING'
- */
+// ==== 1) Verify CSV is loaded and grouped properly ====
+function assertCsvReady(csvPositions: Record<string, CSVSample[]> | null): boolean {
+  if (!csvPositions) { 
+    dlog('csvPositions is NULL'); 
+    return false; 
+  }
+  const keys = Object.keys(csvPositions);
+  if (keys.length === 0) { 
+    dlog('csvPositions has NO KEYS'); 
+    return false; 
+  }
+  // Print first few keys and counts
+  const sample = keys.slice(0, 5).map(k => ({ 
+    id: k, 
+    rows: csvPositions[k]?.length || 0 
+  }));
+  dlog('csvPositions keys sample:', sample);
+  
+  // Sanity for a known ID like P01
+  if (!csvPositions['P01']) {
+    const found = keys.find(k => k.toUpperCase() === 'P01');
+    dlog('P01 present?', !!csvPositions['P01'], 'Case-insensitive found?', !!found, 'Available IDs:', keys.slice(0, 10));
+  }
+  return true;
+}
+
+// Normalize motion field
 function normalizeMotion(m?: string): 'STILL' | 'MOVING' {
   if (!m) return 'MOVING';
   const v = m.trim().toUpperCase();
-  return (v === 'STILL') ? 'STILL' : 'MOVING';
+  return v === 'STILL' ? 'STILL' : 'MOVING';
 }
 
-/**
- * Get or create dwell state for a person
- */
-function getDwell(personId: string): DwellState {
-  let s = dwellState.get(personId);
-  if (!s) {
-    s = { ringDiameterPx: DWELL_DEFAULT_DIAM_PX };
-    dwellState.set(personId, s);
+// Get or create dwell state
+function getDwell(id: string): DwellState {
+  let s = dwellStates.get(id);
+  if (!s) { 
+    s = { ringDiameterPx: DWELL_DEFAULT_DIAM_PX }; 
+    dwellStates.set(id, s); 
   }
   return s;
 }
 
-/**
- * Get interval motion for a person at a given time (with logging)
- */
+// ==== 2) Hardened interval lookup (NEVER silently null) ====
 function getIntervalMotion(
   personId: string,
   timeSec: number,
   csvPositions: Record<string, CSVSample[]> | null
-): { tA: number; tB: number; motion: 'STILL' | 'MOVING' } | null {
-  if (!csvPositions) {
-    console.log('[DWELL] csvPositions is NULL');
-    return null;
+): IntervalMotion | null {
+  if (!csvPositions) { 
+    dlog('getIntervalMotion: csvPositions null'); 
+    return null; 
   }
   const samples = csvPositions[personId];
-  if (!samples) {
-    console.log('[DWELL] No samples for', personId);
-    return null;
+  if (!samples) { 
+    dlog('getIntervalMotion: samples missing for', personId); 
+    return null; 
   }
-  if (samples.length < 2) {
-    console.log('[DWELL] samples.length < 2 for', personId, '(length:', samples.length, ')');
-    return null;
+  if (samples.length < 2) { 
+    dlog('getIntervalMotion: too few samples for', personId, samples.length); 
+    return null; 
   }
 
-  // Find the current interval [tA, tB) where tA <= timeSec < tB
+  // if timeSec < first.tSec => clamp to first interval
+  const first = samples[0], second = samples[1];
+  if (timeSec < first.tSec) {
+    const motion = normalizeMotion(first.motion);
+    dlog('IM<first', personId, { timeSec, interval: `${first.tSec}-${second.tSec}`, motion });
+    return { tA: first.tSec, tB: second.tSec, motion };
+  }
+
+  // in-between windows
   for (let i = 0; i < samples.length - 1; i++) {
     const tA = samples[i].tSec;
     const tB = samples[i + 1].tSec;
-    
+    // Strictly < tB on the right side
     if (timeSec >= tA && timeSec < tB) {
-      // Read motion from the sample at tA and normalize
       const motion = normalizeMotion(samples[i].motion);
-      
       if ((window as any).DEBUG_DWELL && personId === 'P01') {
-        console.log('[DWELL] motion=', motion, 'interval=', `${tA}-${tB}`, 'person=', personId, 'timeSec=', timeSec.toFixed(1));
+        console.log('[DWELL] motion=', motion, 'interval=', `${tA}-${tB}`, 'person=', personId, 'timeSec=', timeSec.toFixed(2));
       }
-      
       return { tA, tB, motion };
     }
   }
 
-  // Beyond last interval - use the last available interval
-  if (samples.length >= 2) {
-    const tA = samples[samples.length - 2].tSec;
-    const tB = samples[samples.length - 1].tSec;
-    const motion = normalizeMotion(samples[samples.length - 2].motion);
-    
-    if ((window as any).DEBUG_DWELL && personId === 'P01') {
-      console.log('[DWELL] motion=', motion, 'interval(end)=', `${tA}-${tB}`, 'person=', personId, 'timeSec=', timeSec.toFixed(1));
-    }
-    
-    return { tA, tB, motion };
-  }
-
-  return null;
+  // Beyond the last interval -> clamp to the last pair
+  const preLast = samples[samples.length - 2];
+  const last = samples[samples.length - 1];
+  const motion = normalizeMotion(preLast.motion);
+  dlog('IM>last', personId, { timeSec, interval: `${preLast.tSec}-${last.tSec}`, motion });
+  return { tA: preLast.tSec, tB: last.tSec, motion };
 }
 
 /**
@@ -124,7 +147,12 @@ function updateDwell(
   csvPositions: Record<string, CSVSample[]> | null
 ): void {
   const im = getIntervalMotion(personId, timeSec, csvPositions);
-  if (!im) return;
+  if (!im) {
+    if ((window as any).DEBUG_DWELL && personId === 'P01') {
+      dlog('NO-IM', personId, { timeSec });
+    }
+    return;
+  }
 
   const key = `${im.tA}-${im.tB}`;
   const s = getDwell(personId);
@@ -135,24 +163,25 @@ function updateDwell(
     if (im.motion === 'MOVING') {
       s.ringDiameterPx = DWELL_DEFAULT_DIAM_PX;
     }
+    // If STILL: do not reset; continue growing across consecutive STILL intervals
     if ((window as any).DEBUG_DWELL && personId === 'P01') {
-      dbg('Interval enter', personId, { key, motion: im.motion, startDiam: s.ringDiameterPx.toFixed(1) });
+      dlog('ENTER interval', personId, { key, motion: im.motion, diam: s.ringDiameterPx.toFixed(1) });
     }
   }
 
   // Apply per-interval rule
   if (im.motion === 'STILL') {
     const before = s.ringDiameterPx;
-    s.ringDiameterPx += DWELL_GROW_DIAM_PER_SEC * dtSec; // unbounded growth
+    s.ringDiameterPx += DWELL_GROW_DIAM_PER_SEC * dtSec;
     if ((window as any).DEBUG_DWELL && personId === 'P01') {
-      dbg('GROW', personId, { before: before.toFixed(1), after: s.ringDiameterPx.toFixed(1), dtSec: dtSec.toFixed(4) });
+      dlog('GROW', personId, { before: before.toFixed(1), after: s.ringDiameterPx.toFixed(1), dtSec: dtSec.toFixed(4) });
     }
   } else { // MOVING
-    s.ringDiameterPx = DWELL_DEFAULT_DIAM_PX;            // fixed size during MOVING
+    s.ringDiameterPx = DWELL_DEFAULT_DIAM_PX;
   }
 
   if ((window as any).DEBUG_DWELL && personId === 'P01' && Math.random() < 0.1) {
-    dbg('State', personId, { motion: im.motion, diam: s.ringDiameterPx.toFixed(1), interval: key });
+    dlog('State', personId, { motion: im.motion, diam: s.ringDiameterPx.toFixed(1), interval: key });
   }
 }
 
@@ -197,8 +226,14 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
     let probeAccum = 0;
 
     function frame(now = performance.now()) {
-      const dtSec = Math.max(0, (now - lastFrameTime) / 1000);
-      lastFrameTime = now;
+      const dtSec = Math.max(0, (now - lastNow) / 1000);
+      lastNow = now;
+
+      // One-time CSV readiness check
+      if (!csvReadinessChecked && csvPositions) {
+        assertCsvReady(csvPositions);
+        csvReadinessChecked = true;
+      }
 
       if (dtSec > 0 && dtSec < 0.1) {
         // Update all dwell states
@@ -212,16 +247,16 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
 
         // Remove states for people no longer visible
         const visibleIds = new Set(activePeople.map((p) => p.id));
-        Array.from(dwellState.keys()).forEach((id) => {
+        Array.from(dwellStates.keys()).forEach((id) => {
           if (!visibleIds.has(id)) {
-            dwellState.delete(id);
+            dwellStates.delete(id);
           }
         });
 
         // rAF delta sanity check (log once per second)
         rafAccum += dtSec;
         if ((window as any).DEBUG_DWELL && rafAccum >= 1) {
-          dbg('dtSec check (last ~1s sum):', rafAccum.toFixed(3));
+          dlog('dtSec~1s total =', rafAccum.toFixed(3));
           rafAccum = 0;
         }
 
@@ -232,7 +267,7 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
           const probeEl = document.getElementById('dwell-probe');
           if (probeEl) {
             const im = getIntervalMotion('P01', timeSec, csvPositions);
-            const s = dwellState.get('P01');
+            const s = dwellStates.get('P01');
             if (im && s) {
               probeEl.textContent = `P01 — motion:${im.motion}  diam:${s.ringDiameterPx.toFixed(1)}  interval:${im.tA}-${im.tB}`;
             }
@@ -273,7 +308,7 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
                 person.currentAngleDeg
               );
 
-              const state = dwellState.get(person.id);
+              const state = dwellStates.get(person.id);
               const ringDiameter = state?.ringDiameterPx || DWELL_DEFAULT_DIAM_PX;
               const ringRadius = ringDiameter / 2;
 
