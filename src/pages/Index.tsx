@@ -359,9 +359,7 @@ const Index = () => {
           opacity: 0
         }} className="flex items-center gap-8">
               {/* Title on the left */}
-              <h2 className="text-2xl font-bold">
-                {layerLabels[selectedLayer]}
-              </h2>
+              
               
               <div className="relative flex justify-center">
                 {/* Overlay below */}
