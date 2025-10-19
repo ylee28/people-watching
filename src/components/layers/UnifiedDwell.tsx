@@ -150,6 +150,29 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
     let secAccum = 0;
     let probeAccum = 0;
 
+    // Rewind to start on mount/CSV load
+    const rewindToStart = () => {
+      usePeoplePlaybackStore.setState({ timeSec: 0 });
+      console.log('[TIME] Rewound to 0s');
+    };
+
+    // Setup dev helpers (global)
+    (window as any).jumpTo = (t: number) => {
+      const state = usePeoplePlaybackStore.getState();
+      const clamped = Math.max(0, Math.min(state.durationSec ?? 0, t));
+      usePeoplePlaybackStore.setState({ timeSec: clamped });
+      console.log('[TIME] Jumped to', clamped, 'seconds');
+    };
+    (window as any).start = () => (window as any).jumpTo(0);
+    (window as any).mid = () => (window as any).jumpTo(30);
+    (window as any).end = () => (window as any).jumpTo(usePeoplePlaybackStore.getState().durationSec ?? 180);
+
+    // Keyboard shortcut: R to rewind
+    const handleKeydown = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === 'r') (window as any).start();
+    };
+    window.addEventListener('keydown', handleKeydown);
+
     const step = () => {
       const now = performance.now();
       const dtSec = Math.max(0, (now - last) / 1000);
@@ -158,6 +181,13 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
       if (!csvPositions || !assertCsvReady(csvPositions)) {
         rafId = requestAnimationFrame(step);
         return;
+      }
+
+      // Auto-loop playback (prevents getting stuck at end)
+      const state = usePeoplePlaybackStore.getState();
+      if (timeSec >= (state.durationSec ?? 180)) {
+        usePeoplePlaybackStore.setState({ timeSec: 0 });
+        console.log('[TIME] Auto-loop → back to 0s');
       }
 
       secAccum += dtSec;
@@ -174,6 +204,14 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
 
       for (const id of ids) {
         updateDwellForPerson(id, timeSec, dtSec, csvPositions);
+      }
+
+      // Quick sanity check for P01
+      if ((window as any).DEBUG_DWELL) {
+        const im = getIntervalMotion('P01', timeSec, csvPositions);
+        if (im && Math.random() < 0.05) {
+          console.log('[CHECK] P01 interval', `${im.tA}-${im.tB}`, 'motion=', im.motion, 'timeSec=', timeSec.toFixed(1));
+        }
       }
 
       // Update visual probe
@@ -196,12 +234,18 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
       rafId = requestAnimationFrame(step);
     };
 
+    // Rewind to start when component mounts and CSV is ready
+    if (csvPositions) {
+      rewindToStart();
+    }
+
     rafId = requestAnimationFrame(step);
 
     return () => {
       if (rafId) {
         cancelAnimationFrame(rafId);
       }
+      window.removeEventListener('keydown', handleKeydown);
     };
   }, [timeSec, csvPositions]);
 
