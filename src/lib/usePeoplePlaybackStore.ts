@@ -319,13 +319,13 @@ export const usePeoplePlaybackStore = create<PeoplePlaybackStore>((set, get) => 
 
   loadData: async () => {
     try {
-      const [peopleRes, timelineRes] = await Promise.all([
-        fetch('/data/people.json'),
-        fetch('/data/timeline.json'),
-      ]);
+      // Load CSV positions
+      const csvRes = await fetch('/data/positions.csv');
+      const csvText = await csvRes.text();
       
+      // Load people metadata
+      const peopleRes = await fetch('/data/people.json');
       const peopleBase: PersonBase[] = await peopleRes.json();
-      let timeline: TimelinePerson[] = await timelineRes.json();
       
       // Build metadata from peopleBase
       const peopleMeta: Record<string, { color: string; posture: string; words: string }> = {};
@@ -337,13 +337,12 @@ export const usePeoplePlaybackStore = create<PeoplePlaybackStore>((set, get) => 
         };
       });
       
-      // Augment timeline with procedural movements
-      timeline = augmentTimeline(timeline);
+      set({ peopleBase, peopleMeta });
       
-      set({ peopleBase, timeline, peopleMeta });
-      get().computePeopleAtTime();
+      // Parse and load CSV data
+      get().loadCSVData(csvText);
     } catch (err) {
-      console.error('Failed to load people data:', err);
+      console.error('Failed to load data:', err);
     }
   },
 
