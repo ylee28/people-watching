@@ -8,7 +8,7 @@ import { usePeoplePlaybackStore } from "@/lib/usePeoplePlaybackStore";
 const dlog = (...a: any[]) => (window as any).DEBUG_DWELL && console.log('[DWELL]', ...a);
 
 const DWELL_DEFAULT_DIAM = 10;   // px (MOVING baseline)
-const DWELL_GROW_PS      = 10;   // px/s when STILL
+const DWELL_GROW_PS      = 1;    // px/s when STILL (changed from 10)
 const DWELL_STROKE       = 2;
 
 // ====== PERSISTENT STATE (MODULE SCOPE - SINGLE SOURCE OF TRUTH) ======
