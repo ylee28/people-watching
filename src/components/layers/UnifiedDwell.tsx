@@ -19,9 +19,9 @@ type CSVSample = {
   motion?: string;
 };
 
-const DWELL_DEFAULT_DIAMETER_PX = 10;
-const DWELL_GROW_DIAM_PER_SEC = 10; // +10px diameter per second
-const STROKE_WIDTH_PX = 2;
+const DWELL_DEFAULT_DIAMETER_PX = 5;  // diameter while MOVING
+const DWELL_GROW_DIAM_PER_SEC = 3;   // +3 px diameter per second while STILL
+const STROKE_WIDTH_PX = 2;           // ring stroke width (solid)
 
 // Module-level persistent state
 const dwellState = new Map<string, DwellState>();
@@ -87,26 +87,25 @@ function updateDwell(
     s = { ringDiameterPx: DWELL_DEFAULT_DIAMETER_PX };
   }
 
-  // If we entered a new interval, reset to default diameter if STILL
+  // If we entered a new interval, reset to default diameter
   if (s.intervalKey !== key) {
     s.intervalKey = key;
-    if (im.motion === 'STILL') {
-      s.ringDiameterPx = DWELL_DEFAULT_DIAMETER_PX;
-    }
+    s.ringDiameterPx = DWELL_DEFAULT_DIAMETER_PX;
   }
 
-  // Apply growth if STILL, hold size if MOVING
+  // Within this interval, apply growth or hold
   if (im.motion === 'STILL') {
-    s.ringDiameterPx += DWELL_GROW_DIAM_PER_SEC * dtSec;
+    s.ringDiameterPx += DWELL_GROW_DIAM_PER_SEC * dtSec; // +3 px diameter per second (unbounded)
+  } else {
+    s.ringDiameterPx = DWELL_DEFAULT_DIAMETER_PX; // fixed at 5px while MOVING
   }
-  // MOVING: maintain current size (no change)
 
   dwellState.set(personId, s);
 }
 
 /**
  * Layer 2: Dwell Time - Shows growing rings around stationary people
- * Rings grow at +10px diameter/sec when motion=STILL, hold size when motion=MOVING
+ * Rings start at 5px diameter and grow at +3px/sec when motion=STILL, fixed at 5px when motion=MOVING
  */
 export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
   const peopleAtTime = usePeoplePlaybackStore((state) => state.peopleAtTime);
