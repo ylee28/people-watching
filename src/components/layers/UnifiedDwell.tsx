@@ -3,16 +3,28 @@ import { CircularGrid } from "../CircularGrid";
 import { polarToCartesian } from "@/lib/roomGeometry";
 import { usePeoplePlaybackStore } from "@/lib/usePeoplePlaybackStore";
 
-// ====== DEBUG SWITCH ======
+// ====== DEBUG & CONSTANTS (SPEC-LOCKED) ======
 (window as any).DEBUG_DWELL = true;
-const dlog = (...a: any[]) => { if ((window as any).DEBUG_DWELL) console.log('[DWELL]', ...a); };
+const dlog = (...a: any[]) => (window as any).DEBUG_DWELL && console.log('[DWELL]', ...a);
 
-// ====== CONSTANTS (SPEC-LOCKED) ======
-const DWELL_DEFAULT_DIAM   = 10;   // px
-const DWELL_GROW_DIAM_PS   = 10;   // px per second while STILL
-const DWELL_STROKE_WIDTH   = 2;
+const DWELL_DEFAULT_DIAM = 10;   // px (MOVING baseline)
+const DWELL_GROW_PS      = 10;   // px/s when STILL
+const DWELL_STROKE       = 2;
 
-// ====== TYPES (JSON Schedule) ======
+// ====== PERSISTENT STATE (MODULE SCOPE - SINGLE SOURCE OF TRUTH) ======
+type DwellState = { lastKey?: string; diamPx: number };
+const dwell = new Map<string, DwellState>();
+
+function getDwell(id: string): DwellState {
+  let s = dwell.get(id);
+  if (!s) { 
+    s = { diamPx: DWELL_DEFAULT_DIAM }; 
+    dwell.set(id, s); 
+  }
+  return s;
+}
+
+// ====== MOTION SCHEDULE (JSON-BASED) ======
 type MotionInterval = { 
   interval: string; 
   tA: number; 
@@ -21,105 +33,162 @@ type MotionInterval = {
   MOVING: string[] 
 };
 type MotionSchedule = { motionSchedule: MotionInterval[] };
-type DwellState = { lastIntervalKey?: string; diamPx: number };
 
-// ====== STATE (PERSISTENT) ======
-const dwellStates = new Map<string, DwellState>();
-
-// ====== HELPERS ======
+let motionSchedule: MotionInterval[] | null = null;
 const canonicalId = (id: string) => String(id).trim().toUpperCase();
 
 /**
- * Get current motion interval at timeSec using [tA, tB) logic.
+ * getInterval: Find current interval for timeSec using [tA, tB) logic.
  */
-function getCurrentInterval(timeSec: number, schedule: MotionInterval[]): MotionInterval | null {
-  for (const iv of schedule) {
+function getInterval(timeSec: number): MotionInterval | null {
+  if (!motionSchedule || motionSchedule.length === 0) return null;
+  for (const iv of motionSchedule) {
     if (timeSec >= iv.tA && timeSec < iv.tB) return iv;
   }
   // Clamp to last interval if beyond
-  return schedule.length > 0 ? schedule[schedule.length - 1] : null;
+  return motionSchedule[motionSchedule.length - 1];
 }
 
 /**
- * Check if a person is in the STILL list for the current interval.
+ * isStill: Check if personId is in STILL list for current interval.
  */
-function isPersonStill(personId: string, interval: MotionInterval | null): boolean {
+function isStill(personId: string, interval: MotionInterval | null): boolean {
   if (!interval) return false;
   const id = canonicalId(personId);
   return interval.STILL.some(p => canonicalId(p) === id);
 }
 
 /**
- * updateDwellLayer: Apply dwell rules using JSON motion schedule.
+ * updateDwell: ONLY place that changes ring size.
+ * Called every rAF with timeSec and dtSec.
  * 
- * SPEC-LOCKED RULES:
- * 1. MOVING interval: diameter = 10px (locked for entire interval)
- * 2. STILL interval: diameter += 10px/sec (unbounded growth)
- * 3. Continuity: STILL → STILL across intervals = keep growing (no reset)
- * 4. Reset: entering MOVING interval = reset diameter to 10px
- * 
- * Called every rAF using the same timeSec as the header timer.
+ * PROOF LOGGING (P01):
+ * - IV: interval, motion state
+ * - GROW: diameter increasing
+ * - DRAW: final radius/diameter
+ * - POST-DRAW: verify no override
  */
-function updateDwellLayer(
-  timeSec: number, 
-  dtSec: number, 
-  schedule: MotionInterval[], 
-  personIds: string[]
-) {
-  const currentInterval = getCurrentInterval(timeSec, schedule);
-  if (!currentInterval) return;
+function updateDwell(personId: string, timeSec: number, dtSec: number) {
+  const iv = getInterval(timeSec);
+  if (!iv) {
+    if (personId === 'P01') dlog('NO-INTERVAL', { t: timeSec.toFixed(1) });
+    return;
+  }
 
-  const intervalKey = `${currentInterval.tA}-${currentInterval.tB}`;
+  const key = `${iv.tA}-${iv.tB}`;
+  const s = getDwell(personId);
+  const still = isStill(personId, iv);
 
-  for (const rawId of personIds) {
-    const id = canonicalId(rawId);
-    const isStill = isPersonStill(rawId, currentInterval);
-    
-    // Get or initialize state
-    const s = dwellStates.get(id) ?? { diamPx: DWELL_DEFAULT_DIAM };
+  // PROOF log: interval + motion
+  if (personId === 'P01') {
+    dlog('IV', { t: timeSec.toFixed(1), key, motion: still ? 'STILL' : 'MOVING', interval: iv.interval });
+  }
 
-    // Detect interval change
-    if (s.lastIntervalKey !== intervalKey) {
-      s.lastIntervalKey = intervalKey;
-      
-      // Rule 4: Reset ONLY when entering MOVING interval
-      if (!isStill) {
-        s.diamPx = DWELL_DEFAULT_DIAM;
-      }
-      // Rule 3: Entering STILL → keep existing diameter (continuity)
-      
-      if (id === 'P01') {
-        dlog('🔄 INTERVAL CHANGE', id, `[${currentInterval.tA}-${currentInterval.tB})`, isStill ? 'STILL' : 'MOVING', `diam=${s.diamPx.toFixed(1)}px`);
-      }
-    }
-
-    // Apply per-frame rule (regardless of interval change)
-    if (isStill) {
-      // Rule 2: STILL → grow by +10px/sec (diameter grows, radius = diameter/2)
-      s.diamPx += DWELL_GROW_DIAM_PS * dtSec;
-    } else {
-      // Rule 1: MOVING → locked at 10px
+  // Reset ONLY when entering a MOVING window
+  if (s.lastKey !== key) {
+    s.lastKey = key;
+    if (!still) {
       s.diamPx = DWELL_DEFAULT_DIAM;
+      if (personId === 'P01') dlog('RESET → MOVING', s.diamPx);
+    } else {
+      if (personId === 'P01') dlog('ENTER STILL (keep diam)', s.diamPx.toFixed(1));
     }
+  }
 
-    dwellStates.set(id, s);
+  // Apply rule
+  if (still) {
+    s.diamPx += DWELL_GROW_PS * dtSec;  // +10 px/sec
+    if (personId === 'P01') dlog('GROW', { d: s.diamPx.toFixed(1), dtSec: dtSec.toFixed(4) });
+  } else {
+    s.diamPx = DWELL_DEFAULT_DIAM;
+  }
+
+  // Draw (SVG circle uses RADIUS = diameter / 2)
+  const r = s.diamPx / 2;
+  const el = document.getElementById(`dwell-ring-${personId}`);
+  
+  if (el) {
+    el.setAttribute('r', String(r));
+    el.setAttribute('stroke-width', String(DWELL_STROKE));
+    el.setAttribute('fill', 'none');
+    el.setAttribute('vector-effect', 'non-scaling-stroke');
+    
+    // PROOF log: final draw
+    if (personId === 'P01') {
+      dlog('DRAW', { r: r.toFixed(1), d: s.diamPx.toFixed(1) });
+    }
+    
+    // TRIPWIRE: detect silent overrides (check if r changed immediately after)
+    if (personId === 'P01') {
+      setTimeout(() => {
+        const chk = document.getElementById(`dwell-ring-${personId}`);
+        if (chk) {
+          const rv = chk.getAttribute('r');
+          dlog('POST-DRAW r=', rv, '(should be', r.toFixed(1), ')');
+        }
+      }, 0);
+    }
+  } else {
+    if (personId === 'P01') {
+      dlog('NO-ELEMENT', `dwell-ring-${personId}`);
+    }
   }
 }
 
+// ====== RAF LOOP (DEDICATED UPDATER) ======
+let rafId: number | null = null;
+let _lastNow = performance.now();
+let _secAccum = 0;
+
+function rafTick() {
+  const now = performance.now();
+  const dtSec = Math.max(0, (now - _lastNow) / 1000);
+  _lastNow = now;
+  _secAccum += dtSec;
+
+  const { timeSec, peopleAtTime } = usePeoplePlaybackStore.getState();
+  
+  // Update ALL visible people (use peopleAtTime keys)
+  const personIds = Object.keys(peopleAtTime);
+  personIds.forEach(id => updateDwell(id, timeSec, dtSec));
+
+  // Proof: dtSec is flowing
+  if (_secAccum >= 1) { 
+    dlog('dtSec~1s', _secAccum.toFixed(3)); 
+    _secAccum = 0; 
+  }
+
+  rafId = requestAnimationFrame(rafTick);
+}
+
+function startDwellLoop() {
+  if (rafId !== null) return; // Already running
+  _lastNow = performance.now();
+  _secAccum = 0;
+  rafId = requestAnimationFrame(rafTick);
+  dlog('🚀 Dwell rAF loop started');
+}
+
+function stopDwellLoop() {
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId);
+    rafId = null;
+    dlog('🛑 Dwell rAF loop stopped');
+  }
+}
+
+// ====== REACT COMPONENT ======
 interface UnifiedDwellProps {
   size?: number;
 }
 
 /**
- * Layer 2: Dwell Time - JSON motion schedule driven.
+ * Layer 2: Dwell Time - JSON motion schedule driven with direct DOM updates.
  * Shows growing rings around stationary people (STILL state).
  */
 export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
   const peopleAtTime = usePeoplePlaybackStore((state) => state.peopleAtTime);
   const timeSec = usePeoplePlaybackStore((state) => state.timeSec);
-  
-  const [lastFrameTime, setLastFrameTime] = React.useState(0);
-  const [schedule, setSchedule] = React.useState<MotionInterval[]>([]);
 
   const center = size / 2;
   const maxRadius = size / 2 - 20;
@@ -129,12 +198,18 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
     fetch('/data/motion_schedule.json')
       .then(res => res.json())
       .then((data: MotionSchedule) => {
-        setSchedule(data.motionSchedule);
-        dlog('✅ Motion schedule loaded:', data.motionSchedule.length, 'intervals');
-        dlog('First interval:', data.motionSchedule[0]);
-        dlog('Last interval:', data.motionSchedule[data.motionSchedule.length - 1]);
+        motionSchedule = data.motionSchedule;
+        dlog('✅ Motion schedule loaded:', motionSchedule.length, 'intervals');
+        dlog('First interval:', motionSchedule[0]);
+        dlog('Last interval:', motionSchedule[motionSchedule.length - 1]);
       })
-      .catch(err => console.error('Failed to load motion schedule:', err));
+      .catch(err => console.error('❌ Failed to load motion schedule:', err));
+  }, []);
+
+  // Start/stop dedicated rAF loop
+  React.useEffect(() => {
+    startDwellLoop();
+    return () => stopDwellLoop();
   }, []);
 
   // Setup dev helpers and visual probe (once)
@@ -159,7 +234,7 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
     // Visual probe overlay
     const probeEl = document.createElement('div');
     probeEl.id = 'dwell-probe';
-    probeEl.style.cssText = 'position:fixed;left:16px;bottom:16px;background:rgba(0,0,0,.8);color:#0f0;padding:8px 12px;border-radius:6px;font:11px/1.4 "Courier New",monospace;pointer-events:none;z-index:9999;border:1px solid #0f0;max-width:320px';
+    probeEl.style.cssText = 'position:fixed;left:16px;bottom:16px;background:rgba(0,0,0,.8);color:#0f0;padding:8px 12px;border-radius:6px;font:11px/1.4 "Courier New",monospace;pointer-events:none;z-index:9999;border:1px solid #0f0;max-width:380px';
     document.body.appendChild(probeEl);
 
     return () => {
@@ -169,57 +244,37 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
     };
   }, []);
 
-  // Update dwell states every frame (driven by global timeSec, same as header timer)
+  // Update visual probe (React-driven, reads from module state)
   React.useEffect(() => {
-    if (schedule.length === 0) return;
+    if (!motionSchedule) return;
 
-    // Calculate dtSec from timeSec delta (rAF-driven)
-    const dtSec = lastFrameTime > 0 ? Math.max(0, timeSec - lastFrameTime) : 0;
-    setLastFrameTime(timeSec);
-
-    // Get all person IDs (from global store, not just visible)
-    const personIds = Object.keys(usePeoplePlaybackStore.getState().peopleAtTime);
-    
-    // Update all dwell states using spec-locked rules
-    updateDwellLayer(timeSec, dtSec, schedule, personIds);
-
-    // Update visual probe
     const probeEl = document.getElementById('dwell-probe');
-    if (probeEl) {
-      const currentInterval = getCurrentInterval(timeSec, schedule);
-      if (!currentInterval) return;
+    if (!probeEl) return;
 
-      const stillCount = currentInterval.STILL.length;
-      const movingCount = currentInterval.MOVING.length;
-      const mm = Math.floor(timeSec / 60);
-      const ss = Math.floor(timeSec % 60);
-      
-      const p01Still = isPersonStill('P01', currentInterval);
-      const p01State = dwellStates.get('P01');
-      
-      const growingPeople = Array.from(dwellStates.entries())
-        .filter(([_, s]) => s.diamPx > DWELL_DEFAULT_DIAM + 1)
-        .sort((a, b) => b[1].diamPx - a[1].diamPx)
-        .slice(0, 4);
-      
-      probeEl.innerHTML = `<strong>Dwell (${stillCount} STILL, ${movingCount} MOVING)</strong><br/>` +
-        `time: ${mm}:${ss.toString().padStart(2,'0')} (${timeSec.toFixed(1)}s)<br/>` +
-        `interval: ${currentInterval.interval}<br/>` +
-        (p01State ? 
-          `P01: <strong>${p01Still ? 'STILL' : 'MOVING'}</strong> ${p01State.diamPx.toFixed(1)}px<br/>` : '') +
-        (growingPeople.length > 0 ? 
-          `Growing: ${growingPeople.map(([id, s]) => `${id}:${s.diamPx.toFixed(0)}px`).join(', ')}` : 
-          'No one growing');
-    }
+    const currentInterval = getInterval(timeSec);
+    if (!currentInterval) return;
 
-    // Log periodic summary
-    if ((window as any).DEBUG_DWELL && Math.floor(timeSec) !== Math.floor(lastFrameTime) && Math.floor(timeSec) % 10 === 0) {
-      const iv = getCurrentInterval(timeSec, schedule);
-      if (iv) {
-        dlog(`⏱️  t=${timeSec.toFixed(1)}s: ${iv.STILL.length} STILL, ${iv.MOVING.length} MOVING`);
-      }
-    }
-  }, [timeSec, lastFrameTime, schedule]);
+    const stillCount = currentInterval.STILL.length;
+    const movingCount = currentInterval.MOVING.length;
+    const mm = Math.floor(timeSec / 60);
+    const ss = Math.floor(timeSec % 60);
+    
+    const p01Still = isStill('P01', currentInterval);
+    const p01State = getDwell('P01');
+    
+    const growingPeople = Array.from(dwell.entries())
+      .filter(([_, s]) => s.diamPx > DWELL_DEFAULT_DIAM + 1)
+      .sort((a, b) => b[1].diamPx - a[1].diamPx)
+      .slice(0, 4);
+    
+    probeEl.innerHTML = `<strong>Dwell (${stillCount} STILL, ${movingCount} MOVING)</strong><br/>` +
+      `time: ${mm}:${ss.toString().padStart(2,'0')} (${timeSec.toFixed(1)}s)<br/>` +
+      `interval: ${currentInterval.interval}<br/>` +
+      `P01: <strong>${p01Still ? 'STILL' : 'MOVING'}</strong> d=${p01State.diamPx.toFixed(1)}px r=${(p01State.diamPx/2).toFixed(1)}px<br/>` +
+      (growingPeople.length > 0 ? 
+        `Growing: ${growingPeople.map(([id, s]) => `${id}:${s.diamPx.toFixed(0)}px`).join(', ')}` : 
+        'No one growing');
+  }, [timeSec]);
 
   return (
     <div className="relative" style={{ width: size, height: size }}>
@@ -237,22 +292,19 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
               );
 
               const canId = canonicalId(person.id);
-              const state = dwellStates.get(canId);
-              const ringDiameter = state?.diamPx || DWELL_DEFAULT_DIAM;
-              const ringRadius = ringDiameter / 2; // SVG circle uses radius, not diameter
-
-              if (ringRadius <= 0) return null;
+              const state = getDwell(canId);
+              const ringRadius = state.diamPx / 2; // Initial render (rAF will update)
 
               return (
                 <circle
                   key={person.id}
-                  id={`dwell-${canId}`}
+                  id={`dwell-ring-${canId}`}
                   cx={coord.x}
                   cy={coord.y}
                   r={ringRadius}
                   fill="none"
                   stroke={person.color}
-                  strokeWidth={DWELL_STROKE_WIDTH}
+                  strokeWidth={DWELL_STROKE}
                   strokeOpacity={0.9}
                   vectorEffect="non-scaling-stroke"
                 />
