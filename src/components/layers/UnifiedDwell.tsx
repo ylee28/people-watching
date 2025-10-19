@@ -104,20 +104,21 @@ function updateDwell(
     s = { ringDiameterPx: DWELL_DEFAULT_DIAMETER_PX };
   }
 
-  // If we entered a new interval, reset to default diameter
-  if (s.intervalKey !== key) {
+  // If we entered a new STILL interval, reset to default diameter
+  if (s.intervalKey !== key && im.motion === 'STILL') {
     s.intervalKey = key;
     s.ringDiameterPx = DWELL_DEFAULT_DIAMETER_PX;
+  } else if (s.intervalKey !== key) {
+    // Just update the interval key for MOVING
+    s.intervalKey = key;
   }
 
-  // Apply growth or hold based on motion
+  // Apply growth only when STILL (hold size when MOVING)
   if (im.motion === 'STILL') {
     // Grow +3px diameter per second (unbounded)
     s.ringDiameterPx += DWELL_GROW_DIAM_PER_SEC * dtSec;
-  } else {
-    // MOVING: fixed at default diameter
-    s.ringDiameterPx = DWELL_DEFAULT_DIAMETER_PX;
   }
+  // When MOVING: don't modify diameter, maintain current size
 
   dwellState.set(personId, s);
 }
