@@ -51,11 +51,11 @@ function getInterval(timeSec: number): MotionInterval | null {
 
 /**
  * isStill: Check if personId is in STILL list for current interval.
+ * personId is already canonical, schedule lists are canonical after load.
  */
 function isStill(personId: string, interval: MotionInterval | null): boolean {
   if (!interval) return false;
-  const id = canonicalId(personId);
-  return interval.STILL.some(p => canonicalId(p) === id);
+  return interval.STILL.includes(personId); // Simple lookup, both sides canonical
 }
 
 /**
@@ -147,10 +147,19 @@ function rafTick() {
   _secAccum += dtSec;
 
   const { timeSec, peopleAtTime } = usePeoplePlaybackStore.getState();
-  
-  // Update ALL visible people (use peopleAtTime keys)
-  const personIds = Object.keys(peopleAtTime);
-  personIds.forEach(id => updateDwell(id, timeSec, dtSec));
+
+  // Don't run until schedule is ready
+  if (!motionSchedule) {
+    rafId = requestAnimationFrame(rafTick);
+    return;
+  }
+
+  // ✅ Correct: iterate the array, keep only visible, pass CANONICAL ids
+  const ids = (Array.isArray(peopleAtTime) ? peopleAtTime : Object.values(peopleAtTime))
+    .filter((p: any) => p?.isVisible !== false)
+    .map((p: any) => canonicalId(p.id));
+
+  ids.forEach(id => updateDwell(id, timeSec, dtSec));
 
   // Proof: dtSec is flowing
   if (_secAccum >= 1) { 
@@ -198,7 +207,12 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
     fetch('/data/motion_schedule.json')
       .then(res => res.json())
       .then((data: MotionSchedule) => {
-        motionSchedule = data.motionSchedule;
+        // Canonicalize IDs inside STILL/MOVING lists once
+        motionSchedule = data.motionSchedule.map(iv => ({
+          ...iv,
+          STILL: iv.STILL.map(canonicalId),
+          MOVING: iv.MOVING.map(canonicalId),
+        }));
         dlog('✅ Motion schedule loaded:', motionSchedule.length, 'intervals');
         dlog('First interval:', motionSchedule[0]);
         dlog('Last interval:', motionSchedule[motionSchedule.length - 1]);
