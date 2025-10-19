@@ -307,11 +307,16 @@ export const usePeoplePlaybackStore = create<PeoplePlaybackStore>((set, get) => 
   tick: (deltaTime: number) => {
     const { timeSec, speed, durationSec } = get();
     
-    // Clamp at end, don't wrap or reset
-    const newTime = Math.min(timeSec + deltaTime * speed, durationSec);
+    // Auto-loop at end
+    let newTime = timeSec + deltaTime * speed;
+    if (newTime >= durationSec) {
+      newTime = 0;
+      console.log('[TIME] Auto-loop → back to 0s');
+    }
+    
     set({ timeSec: newTime });
     
-    // Always recompute, even at end (for rendering consistency)
+    // Always recompute
     get().computePeopleAtTime();
   },
 
@@ -406,6 +411,7 @@ export const usePeoplePlaybackStore = create<PeoplePlaybackStore>((set, get) => 
       
       const durationSec = maxTime;
       set({ csvPositions, durationSec, timeSec: 0 });
+      console.log('[TIME] CSV loaded, rewound to 0s');
       get().computePeopleAtTime();
     } catch (err) {
       console.error('Failed to parse CSV:', err);
