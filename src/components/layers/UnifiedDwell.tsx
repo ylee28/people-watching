@@ -7,10 +7,10 @@ import { usePeoplePlaybackStore } from "@/lib/usePeoplePlaybackStore";
 (window as any).DEBUG_DWELL = true;
 const dlog = (...a: any[]) => { if ((window as any).DEBUG_DWELL) console.log('[DWELL]', ...a); };
 
-// ====== CONSTANTS ======
-const DWELL_DEFAULT_DIAM = 10;   // px
-const DWELL_GROW_DIAM_PS = 10;   // px per second
-const DWELL_STROKE = 2;
+// ====== CONSTANTS (SPEC-LOCKED) ======
+const DWELL_DEFAULT_DIAM   = 10;   // px
+const DWELL_GROW_DIAM_PS   = 10;   // px per second while STILL
+const DWELL_STROKE_WIDTH   = 2;
 
 // ====== TYPES (JSON Schedule) ======
 type MotionInterval = { 
@@ -50,13 +50,15 @@ function isPersonStill(personId: string, interval: MotionInterval | null): boole
 }
 
 /**
- * Update dwell layer for all people using JSON motion schedule.
+ * updateDwellLayer: Apply dwell rules using JSON motion schedule.
  * 
- * RULES:
+ * SPEC-LOCKED RULES:
  * 1. MOVING interval: diameter = 10px (locked for entire interval)
  * 2. STILL interval: diameter += 10px/sec (unbounded growth)
  * 3. Continuity: STILL → STILL across intervals = keep growing (no reset)
  * 4. Reset: entering MOVING interval = reset diameter to 10px
+ * 
+ * Called every rAF using the same timeSec as the header timer.
  */
 function updateDwellLayer(
   timeSec: number, 
@@ -71,28 +73,29 @@ function updateDwellLayer(
 
   for (const rawId of personIds) {
     const id = canonicalId(rawId);
-    const s = dwellStates.get(id) ?? { diamPx: DWELL_DEFAULT_DIAM };
     const isStill = isPersonStill(rawId, currentInterval);
+    
+    // Get or initialize state
+    const s = dwellStates.get(id) ?? { diamPx: DWELL_DEFAULT_DIAM };
 
     // Detect interval change
-    const intervalChanged = s.lastIntervalKey !== intervalKey;
-    if (intervalChanged) {
+    if (s.lastIntervalKey !== intervalKey) {
       s.lastIntervalKey = intervalKey;
       
-      // Rule 4: Reset on entering MOVING interval
+      // Rule 4: Reset ONLY when entering MOVING interval
       if (!isStill) {
         s.diamPx = DWELL_DEFAULT_DIAM;
       }
-      // Rule 3: Entering STILL interval → keep existing diameter (continuity)
+      // Rule 3: Entering STILL → keep existing diameter (continuity)
       
       if (id === 'P01') {
-        dlog('🔄 ENTER', id, `[${currentInterval.tA}-${currentInterval.tB})`, isStill ? 'STILL' : 'MOVING', `diam=${s.diamPx.toFixed(1)}px`, currentInterval.interval);
+        dlog('🔄 INTERVAL CHANGE', id, `[${currentInterval.tA}-${currentInterval.tB})`, isStill ? 'STILL' : 'MOVING', `diam=${s.diamPx.toFixed(1)}px`);
       }
     }
 
-    // Apply per-frame rule
+    // Apply per-frame rule (regardless of interval change)
     if (isStill) {
-      // Rule 2: STILL → grow by 10px/sec
+      // Rule 2: STILL → grow by +10px/sec (diameter grows, radius = diameter/2)
       s.diamPx += DWELL_GROW_DIAM_PS * dtSec;
     } else {
       // Rule 1: MOVING → locked at 10px
@@ -100,11 +103,6 @@ function updateDwellLayer(
     }
 
     dwellStates.set(id, s);
-
-    // Debug P01 periodically
-    if (id === 'P01' && Math.random() < 0.05) {
-      dlog('timeSec', timeSec.toFixed(1), 'interval', `${currentInterval.tA}-${currentInterval.tB}`, 'motion', isStill ? 'STILL' : 'MOVING', 'diam', s.diamPx.toFixed(1));
-    }
   }
 }
 
@@ -171,15 +169,18 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
     };
   }, []);
 
-  // Update dwell states every frame (driven by global timeSec)
+  // Update dwell states every frame (driven by global timeSec, same as header timer)
   React.useEffect(() => {
     if (schedule.length === 0) return;
 
+    // Calculate dtSec from timeSec delta (rAF-driven)
     const dtSec = lastFrameTime > 0 ? Math.max(0, timeSec - lastFrameTime) : 0;
     setLastFrameTime(timeSec);
 
-    // Get all person IDs from peopleAtTime (visible + invisible)
+    // Get all person IDs (from global store, not just visible)
     const personIds = Object.keys(usePeoplePlaybackStore.getState().peopleAtTime);
+    
+    // Update all dwell states using spec-locked rules
     updateDwellLayer(timeSec, dtSec, schedule, personIds);
 
     // Update visual probe
@@ -238,7 +239,7 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
               const canId = canonicalId(person.id);
               const state = dwellStates.get(canId);
               const ringDiameter = state?.diamPx || DWELL_DEFAULT_DIAM;
-              const ringRadius = ringDiameter / 2; // IMPORTANT: SVG circle uses radius, not diameter
+              const ringRadius = ringDiameter / 2; // SVG circle uses radius, not diameter
 
               if (ringRadius <= 0) return null;
 
@@ -251,8 +252,8 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
                   r={ringRadius}
                   fill="none"
                   stroke={person.color}
-                  strokeWidth={DWELL_STROKE}
-                  strokeOpacity="0.9"
+                  strokeWidth={DWELL_STROKE_WIDTH}
+                  strokeOpacity={0.9}
                   vectorEffect="non-scaling-stroke"
                 />
               );
