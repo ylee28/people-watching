@@ -168,6 +168,8 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
       }
     }
     
+    dlog('📥 Raw CSV rows (first 10):', rows.slice(0, 10).map(r => `${r.personId}@${r.tSec}:${r.motion}`));
+    
     motionSchedule = buildMotionSchedule(rows);
     scheduleInitialized = true;
     
@@ -175,11 +177,9 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
     dlog('✅ Motion schedule built:', ids.length, 'people');
     dlog('Schedule keys:', ids.slice(0, 10));
     
-    // Log first person's schedule as example
-    if (ids.length > 0) {
-      const firstId = ids[0];
-      const firstSched = motionSchedule[firstId].slice(0, 5);
-      dlog(`${firstId} schedule (first 5):`, firstSched);
+    // Log P01's schedule in detail (all intervals)
+    if (motionSchedule['P01']) {
+      dlog('🔍 P01 complete schedule:', motionSchedule['P01']);
     }
   }, [csvPositions]);
 
