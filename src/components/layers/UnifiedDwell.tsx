@@ -171,16 +171,44 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
       updateDwell(id, timeSec, dtSec, csvPositions);
     }
 
-    // Update visual probe
+    // Log summary of ALL people growing (once per second)
+    if ((window as any).DEBUG_DWELL && Math.floor(timeSec) !== Math.floor(timeSec - dtSec)) {
+      const growingPeople = ids
+        .map(id => {
+          const s = dwellStates.get(id);
+          const iv = getInterval(id, timeSec, csvPositions);
+          return { id, diam: s?.diamPx || 10, motion: iv?.motion };
+        })
+        .filter(p => p.motion === 'STILL');
+      
+      if (growingPeople.length > 0) {
+        dlog('🌱 GROWING (' + growingPeople.length + ' people):', 
+          growingPeople.slice(0, 5).map(p => `${p.id}:${p.diam.toFixed(0)}px`).join(', '),
+          growingPeople.length > 5 ? '...' : ''
+        );
+      }
+    }
+
+    // Update visual probe - show ALL growing people
     const probeEl = document.getElementById('dwell-probe');
     if (probeEl) {
-      const iv = getInterval('P01', timeSec, csvPositions);
-      const s = dwellStates.get('P01');
-      if (iv && s) {
-        const mm = Math.floor(timeSec / 60);
-        const ss = Math.floor(timeSec % 60);
-        probeEl.innerHTML = `<strong>P01 Debug</strong><br/>time: ${mm}:${ss.toString().padStart(2,'0')}<br/>motion: <strong>${iv.motion}</strong><br/>diam: ${s.diamPx.toFixed(1)}px<br/>interval: ${iv.tA}-${iv.tB}`;
-      }
+      const allStates = ids.map(id => {
+        const iv = getInterval(id, timeSec, csvPositions);
+        const s = dwellStates.get(id);
+        return { id, iv, s };
+      }).filter(p => p.iv && p.s);
+
+      const stillPeople = allStates.filter(p => p.iv!.motion === 'STILL');
+      const mm = Math.floor(timeSec / 60);
+      const ss = Math.floor(timeSec % 60);
+      
+      const p01Data = allStates.find(p => p.id === 'P01');
+      
+      probeEl.innerHTML = `<strong>Dwell Debug (${stillPeople.length} STILL)</strong><br/>` +
+        `time: ${mm}:${ss.toString().padStart(2,'0')}<br/>` +
+        (p01Data && p01Data.iv ? 
+          `P01: <strong>${p01Data.iv.motion}</strong> ${p01Data.s!.diamPx.toFixed(1)}px [${p01Data.iv.tA}-${p01Data.iv.tB}]<br/>` : '') +
+        `Growing: ${stillPeople.slice(0, 4).map(p => `${p.id}:${p.s!.diamPx.toFixed(0)}px`).join(', ')}${stillPeople.length > 4 ? '...' : ''}`;
     }
 
     // Log once per second
