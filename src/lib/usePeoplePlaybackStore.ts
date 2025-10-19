@@ -12,6 +12,7 @@ export interface PersonBase {
 
 export interface CSVSample {
   tSec: number;
+  time?: string;
   angleDeg?: number;
   radiusFactor?: number;
   bench?: string;
@@ -374,6 +375,10 @@ export const usePeoplePlaybackStore = create<PeoplePlaybackStore>((set, get) => 
         maxTime = Math.max(maxTime, tSec);
         
         const sample: CSVSample = { tSec };
+        
+        if (row.time) {
+          sample.time = String(row.time);
+        }
         
         if (row.angleDeg && row.angleDeg !== '') {
           sample.angleDeg = normalizeAngle(parseFloat(row.angleDeg));
