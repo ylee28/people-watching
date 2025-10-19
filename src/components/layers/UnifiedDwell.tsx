@@ -67,9 +67,19 @@ function getIntervalMotion(
   timeSec: number,
   csvPositions: Record<string, CSVSample[]> | null
 ): { tA: number; tB: number; motion: 'STILL' | 'MOVING' } | null {
-  if (!csvPositions) return null;
+  if (!csvPositions) {
+    console.log('[DWELL] csvPositions is NULL');
+    return null;
+  }
   const samples = csvPositions[personId];
-  if (!samples || samples.length < 2) return null;
+  if (!samples) {
+    console.log('[DWELL] No samples for', personId);
+    return null;
+  }
+  if (samples.length < 2) {
+    console.log('[DWELL] samples.length < 2 for', personId, '(length:', samples.length, ')');
+    return null;
+  }
 
   // Find the current interval [tA, tB) where tA <= timeSec < tB
   for (let i = 0; i < samples.length - 1; i++) {
@@ -95,7 +105,7 @@ function getIntervalMotion(
     const motion = normalizeMotion(samples[samples.length - 2].motion);
     
     if ((window as any).DEBUG_DWELL && personId === 'P01') {
-      dbg('IM(end)', personId, { timeSec: timeSec.toFixed(1), motion, interval: `${tA}-${tB}` });
+      console.log('[DWELL] motion=', motion, 'interval(end)=', `${tA}-${tB}`, 'person=', personId, 'timeSec=', timeSec.toFixed(1));
     }
     
     return { tA, tB, motion };
