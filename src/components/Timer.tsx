@@ -30,10 +30,15 @@ export const Timer: React.FC<TimerProps> = ({
   const display = `${((hh % 12) || 12)}:${mm.toString().padStart(2,'0')}:${ss.toString().padStart(2,'0')} ${hh >= 12 ? 'PM' : 'AM'}`;
   
   return (
-    <div className="text-center pointer-events-none">
-      <span className="text-[18px] md:text-[20px] font-medium leading-none text-foreground">
+    <div className="text-center">
+      <button 
+        onClick={onTogglePause}
+        disabled={isComplete}
+        className="text-[18px] md:text-[20px] font-medium leading-none text-foreground cursor-pointer hover:opacity-80 transition-opacity"
+        aria-label={isPlaying ? "Pause" : "Play"}
+      >
         {isComplete ? "Train arrived" : display}
-      </span>
+      </button>
     </div>
   );
 };
