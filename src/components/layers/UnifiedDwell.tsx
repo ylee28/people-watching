@@ -85,27 +85,19 @@ function updateDwell(personId: string, timeSec: number, dtSec: number, map: Reco
     if (iv.motion === 'MOVING') s.diamPx = DWELL_DEFAULT_DIAM; // baseline on moving window
     // if STILL, do not reset; continue growth across STILL→STILL
     
-    if (personId === 'P01') {
-      dlog('🔄 ENTER interval', personId, { key, motion: iv.motion, diam: s.diamPx.toFixed(1), timeSec: timeSec.toFixed(2) });
-    }
+    dlog('🔄 ENTER interval', personId, { key, motion: iv.motion, diam: s.diamPx.toFixed(1), timeSec: timeSec.toFixed(2) });
   }
 
   // Apply rule
   if (iv.motion === 'STILL') {
     s.diamPx += DWELL_GROW_DIAM_PER_SEC * dtSec;
-    if (personId === 'P01') {
-      dlog('📈 GROW', personId, { diam: s.diamPx.toFixed(1), dtSec: dtSec.toFixed(4), timeSec: timeSec.toFixed(2) });
-    }
+    dlog('📈 GROW', personId, { diam: s.diamPx.toFixed(1), dtSec: dtSec.toFixed(4), timeSec: timeSec.toFixed(2) });
   } else {
     s.diamPx = DWELL_DEFAULT_DIAM;
   }
 
   s.lastTimeSec = timeSec;
   dwellStates.set(personId, s);
-
-  if (personId === 'P01' && Math.random() < 0.02) {
-    dlog('🎯 State', personId, { motion: iv.motion, radius: (s.diamPx / 2).toFixed(1), diam: s.diamPx.toFixed(1), interval: key, timeSec: timeSec.toFixed(2) });
-  }
 }
 
 interface UnifiedDwellProps {
