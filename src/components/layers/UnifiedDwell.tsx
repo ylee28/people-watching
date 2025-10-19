@@ -79,7 +79,9 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
             }
             
             // Determine if the current INTERVAL is STILL or MOVING
-            // Use bracketing CSV samples A and B
+            // Compare the CSV keyframes that bracket the current time:
+            // - If sampleA and sampleB have the same position → STILL (ring grows)
+            // - If sampleA and sampleB have different positions → MOVING (ring at default)
             let intervalStill = false;
             
             if (csvPositions) {
@@ -115,18 +117,18 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
                   const dAng = Math.abs(shortestAngularDelta(aA, aB));
                   const dRad = Math.abs(rB - rA);
                   
-                  // INTERVAL_STILL if the keyframes are identical
+                  // INTERVAL_STILL: sampleA and sampleB have the same position
                   intervalStill = dAng <= ANGLE_EPS && dRad <= RADIUS_EPS;
                 }
               }
             }
             
             if (intervalStill) {
-              // Position unchanged in this interval: grow unbounded
+              // Position unchanged in this interval: grow continuously, accumulate across intervals
               state.dwellSec += dtSec;
               state.ringRadiusPx = DEFAULT_RADIUS_PX + GROW_RADIUS_PER_SEC * state.dwellSec;
             } else {
-              // Position changing: snap back to default
+              // Position changing in this interval: snap back to default
               state.ringRadiusPx = DEFAULT_RADIUS_PX;
               state.dwellSec = 0;
             }
