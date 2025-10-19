@@ -19,8 +19,8 @@ type CSVSample = {
   motion?: string;
 };
 
-const DWELL_DEFAULT_DIAMETER_PX = 5;
-const DWELL_GROW_DIAM_PER_SEC = 3; // +3px diameter per second
+const DWELL_DEFAULT_DIAMETER_PX = 10;
+const DWELL_GROW_DIAM_PER_SEC = 10; // +10px diameter per second
 const STROKE_WIDTH_PX = 2;
 
 // Module-level persistent state
@@ -29,7 +29,6 @@ const dwellState = new Map<string, DwellState>();
 // rAF loop state
 let rafId: number | null = null;
 let lastFrameTime = performance.now();
-let debugTimer = 0;
 
 /**
  * Get interval motion for a person at a given time
@@ -65,28 +64,12 @@ function getIntervalMotion(
     }
   }
 
-  // If beyond last interval, use the last sample's interval
-  if (samples.length >= 2) {
-    const tA = samples[samples.length - 2].tSec;
-    const tB = samples[samples.length - 1].tSec;
-    const motion = samples[samples.length - 2].motion;
-    
-    if (!motion || motion === '') {
-      return { tA, tB, motion: 'MOVING' };
-    }
-    
-    return {
-      tA,
-      tB,
-      motion: motion === 'STILL' ? 'STILL' : 'MOVING'
-    };
-  }
-
+  // Beyond last interval
   return null;
 }
 
 /**
- * Update dwell for one person (motion column only)
+ * Update dwell for one person
  */
 function updateDwell(
   personId: string,
@@ -104,52 +87,26 @@ function updateDwell(
     s = { ringDiameterPx: DWELL_DEFAULT_DIAMETER_PX };
   }
 
-  // If we entered a new interval, reset to default diameter
+  // If we entered a new interval, reset to default diameter if STILL
   if (s.intervalKey !== key) {
     s.intervalKey = key;
-    s.ringDiameterPx = DWELL_DEFAULT_DIAMETER_PX;
+    if (im.motion === 'STILL') {
+      s.ringDiameterPx = DWELL_DEFAULT_DIAMETER_PX;
+    }
   }
 
-  // Apply growth or hold based on motion
+  // Apply growth if STILL, hold size if MOVING
   if (im.motion === 'STILL') {
-    // Grow +3px diameter per second (unbounded)
     s.ringDiameterPx += DWELL_GROW_DIAM_PER_SEC * dtSec;
-  } else {
-    // MOVING: fixed at default diameter
-    s.ringDiameterPx = DWELL_DEFAULT_DIAMETER_PX;
   }
+  // MOVING: maintain current size (no change)
 
   dwellState.set(personId, s);
 }
 
 /**
- * Debug logging (once per second for P01)
- */
-function debugDwell(
-  dtSec: number,
-  timeSec: number,
-  csvPositions: Record<string, CSVSample[]> | null
-): void {
-  debugTimer += dtSec;
-  if (debugTimer < 1) return;
-  debugTimer = 0;
-
-  const im = getIntervalMotion('P01', timeSec, csvPositions);
-  const s = dwellState.get('P01');
-  
-  if (im && s) {
-    console.log('[Dwell][P01]', {
-      tSec: timeSec.toFixed(1),
-      interval: `${im.tA}-${im.tB}`,
-      motion: im.motion,
-      diameter: s.ringDiameterPx.toFixed(2)
-    });
-  }
-}
-
-/**
  * Layer 2: Dwell Time - Shows growing rings around stationary people
- * Rings grow at +3px diameter/sec when motion=STILL, fixed at 5px when motion=MOVING
+ * Rings grow at +10px diameter/sec when motion=STILL, hold size when motion=MOVING
  */
 export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
   const peopleAtTime = usePeoplePlaybackStore((state) => state.peopleAtTime);
@@ -160,7 +117,7 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
   const center = size / 2;
   const maxRadius = size / 2 - 20;
 
-  // Main animation loop - use real frame delta from performance.now()
+  // Main animation loop
   React.useEffect(() => {
     function frame(now = performance.now()) {
       const dtSec = Math.max(0, (now - lastFrameTime) / 1000);
@@ -183,9 +140,6 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
             dwellState.delete(id);
           }
         });
-
-        // Debug logging
-        debugDwell(dtSec, timeSec, csvPositions);
 
         // Force re-render
         forceUpdate({});
