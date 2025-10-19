@@ -112,7 +112,7 @@ const Index = () => {
       case "dwell":
         return <UnifiedDwell />;
       case "notes":
-        return <UnifiedNotes />;
+        return <UnifiedColors />;
       case "movement":
         return <UnifiedMovement />;
       case "coverage":
