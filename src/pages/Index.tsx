@@ -114,7 +114,7 @@ const Index = () => {
       case "notes":
         return <UnifiedNotes />;
       case "movement":
-        return <UnifiedColors />;
+        return <UnifiedMovement />;
       case "coverage":
         return <UnifiedColors />;
     }
