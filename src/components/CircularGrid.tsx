@@ -39,7 +39,7 @@ export const CircularGrid: React.FC<CircularGridProps> = ({
             cy={center}
             r={radius}
             fill="none"
-            stroke="hsl(var(--muted-foreground))"
+            stroke="#CFBD94"
             strokeWidth="1"
             opacity="0.2"
           />
@@ -57,7 +57,7 @@ export const CircularGrid: React.FC<CircularGridProps> = ({
             y1={center}
             x2={outerPoint.x}
             y2={outerPoint.y}
-            stroke="hsl(var(--muted-foreground))"
+            stroke="#CFBD94"
             strokeWidth="1"
             opacity="0.2"
           />
@@ -78,31 +78,16 @@ export const CircularGrid: React.FC<CircularGridProps> = ({
           `A ${benchRadius} ${benchRadius} 0 ${largeArcFlag} 0 ${endPos.x} ${endPos.y}`,
         ].join(" ");
 
-        // Label position at mid-angle, slightly outside the bench arc
-        const midAngle = (bench.startDeg + bench.endDeg) / 2;
-        const labelPos = polarToCartesian(center, center, benchRadius + 20, midAngle);
-
         return (
           <g key={bench.id}>
             {/* Bench arc */}
             <path
               d={pathData}
               fill="none"
-              stroke={bench.color}
+              stroke="#CFBD94"
               strokeWidth="4"
               opacity="0.6"
             />
-            {/* Label */}
-            <text
-              x={labelPos.x}
-              y={labelPos.y}
-              textAnchor="middle"
-              dominantBaseline="middle"
-              className="text-xs font-semibold"
-              fill={bench.color}
-            >
-              {bench.id}
-            </text>
           </g>
         );
       })}

@@ -19,8 +19,9 @@ const COLOR: Record<string, string> = {
 const pid = (id: string) => id.trim().toUpperCase();
 
 // ====== TRAIL CONSTANTS ======
+const DOT_RADIUS = 12;         // dot size
 const STROKE_OPACITY = 0.22;   // subtle "paint" look
-const STROKE_WIDTH = 3;        // brush thickness
+const STROKE_WIDTH = DOT_RADIUS * 2; // trail same size as dot (diameter)
 const MIN_DIST_PX = 2;         // add point only if moved ≥ 2px
 
 // ====== TRAIL STATE (MODULE SCOPE) ======
@@ -157,7 +158,7 @@ export const UnifiedMovement: React.FC<UnifiedMovementProps> = ({ size = 520 }) 
                   key={person.id}
                   cx={coord.x}
                   cy={coord.y}
-                  r="6"
+                  r={DOT_RADIUS}
                   fill={color}
                 />
               );

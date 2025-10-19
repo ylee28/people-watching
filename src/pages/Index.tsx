@@ -357,8 +357,9 @@ const Index = () => {
         }} exit={{
           scale: 0.8,
           opacity: 0
-        }} className="space-y-4">
-              <h2 className="text-2xl font-bold text-center mb-6">
+        }} className="flex items-center gap-8">
+              {/* Title on the left */}
+              <h2 className="text-2xl font-bold">
                 {layerLabels[selectedLayer]}
               </h2>
               
