@@ -51,8 +51,12 @@ function isPersonStill(personId: string, interval: MotionInterval | null): boole
 
 /**
  * Update dwell layer for all people using JSON motion schedule.
- * MOVING interval: diameter = 10px
- * STILL interval: diameter grows +10px/sec (unbounded), continues across consecutive STILL
+ * 
+ * RULES:
+ * 1. MOVING interval: diameter = 10px (locked for entire interval)
+ * 2. STILL interval: diameter += 10px/sec (unbounded growth)
+ * 3. Continuity: STILL → STILL across intervals = keep growing (no reset)
+ * 4. Reset: entering MOVING interval = reset diameter to 10px
  */
 function updateDwellLayer(
   timeSec: number, 
@@ -70,24 +74,29 @@ function updateDwellLayer(
     const s = dwellStates.get(id) ?? { diamPx: DWELL_DEFAULT_DIAM };
     const isStill = isPersonStill(rawId, currentInterval);
 
-    // On entering new interval
-    if (s.lastIntervalKey !== intervalKey) {
+    // Detect interval change
+    const intervalChanged = s.lastIntervalKey !== intervalKey;
+    if (intervalChanged) {
       s.lastIntervalKey = intervalKey;
-      // Reset to baseline only for MOVING state (keep growing if still STILL)
+      
+      // Rule 4: Reset on entering MOVING interval
       if (!isStill) {
         s.diamPx = DWELL_DEFAULT_DIAM;
       }
+      // Rule 3: Entering STILL interval → keep existing diameter (continuity)
       
       if (id === 'P01') {
         dlog('🔄 ENTER', id, `[${currentInterval.tA}-${currentInterval.tB})`, isStill ? 'STILL' : 'MOVING', `diam=${s.diamPx.toFixed(1)}px`, currentInterval.interval);
       }
     }
 
-    // Apply growth rule
+    // Apply per-frame rule
     if (isStill) {
-      s.diamPx += DWELL_GROW_DIAM_PS * dtSec; // +10px per second (unbounded)
+      // Rule 2: STILL → grow by 10px/sec
+      s.diamPx += DWELL_GROW_DIAM_PS * dtSec;
     } else {
-      s.diamPx = DWELL_DEFAULT_DIAM; // locked at 10px during MOVING
+      // Rule 1: MOVING → locked at 10px
+      s.diamPx = DWELL_DEFAULT_DIAM;
     }
 
     dwellStates.set(id, s);
