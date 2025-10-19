@@ -1,5 +1,6 @@
 import * as React from "react";
-import { CircularGrid, polarToCartesian } from "../CircularGrid";
+import { CircularGrid } from "../CircularGrid";
+import { polarToCartesian } from "@/lib/roomGeometry";
 import { usePeoplePlaybackStore } from "@/lib/usePeoplePlaybackStore";
 
 interface UnifiedCoverageProps {

@@ -1,37 +1,25 @@
 import * as React from "react";
+import { ROOM, polarToCartesian } from "@/lib/roomGeometry";
 
 interface CircularGridProps {
   size?: number;
-  concentricRings?: number;
-  radialLines?: number;
   className?: string;
 }
 
 /**
- * CircularGrid: Draws a circular grid with concentric circles and radial lines.
- * Used as the base visualization for all layers.
+ * CircularGrid: Draws a circular grid matching the CSV reference
+ * - 10 sectors (36° each)
+ * - 5 rings
+ * - 0° = right, 90° = top, counter-clockwise
+ * - Benches at specified positions
  */
 export const CircularGrid: React.FC<CircularGridProps> = ({
   size = 520,
-  concentricRings = 5,
-  radialLines = 10, // 10 wedges = 36° each
   className = "",
 }) => {
   const center = size / 2;
   const maxRadius = size / 2 - 20; // padding
-
-  // Bench arc definitions: [centerAngle, ±18°]
-  const benches = [
-    { label: "R", center: 0, color: "#e74c3c" },
-    { label: "T2", center: 72, color: "#3498db" },
-    { label: "T1", center: 108, color: "#2ecc71" },
-    { label: "L", center: 180, color: "#f39c12" },
-    { label: "B1", center: 252, color: "#9b59b6" },
-    { label: "B2", center: 288, color: "#1abc9c" },
-  ];
-
-  const benchRadius = maxRadius * 0.92;
-  const benchArcSpan = 36; // ±18° = 36° total
+  const benchRadius = maxRadius * 0.92; // Bench arcs slightly inside the rim
 
   return (
     <svg
@@ -39,11 +27,11 @@ export const CircularGrid: React.FC<CircularGridProps> = ({
       height={size}
       viewBox={`0 0 ${size} ${size}`}
       className={className}
-      aria-label="Circular grid visualization with benches"
+      aria-label="Circular grid visualization with 10 sectors and 5 rings"
     >
-      {/* Concentric circles */}
-      {Array.from({ length: concentricRings }).map((_, i) => {
-        const radius = (maxRadius / concentricRings) * (i + 1);
+      {/* Concentric rings (5 rings) */}
+      {ROOM.ringRadiusFactors.map((factor, i) => {
+        const radius = maxRadius * factor;
         return (
           <circle
             key={`ring-${i}`}
@@ -58,19 +46,17 @@ export const CircularGrid: React.FC<CircularGridProps> = ({
         );
       })}
 
-      {/* Radial wedge lines (10 wedges = 36° each) */}
-      {Array.from({ length: radialLines }).map((_, i) => {
-        const angle = (i * 360) / radialLines;
-        const radians = (angle * Math.PI) / 180;
-        const x2 = center + maxRadius * Math.cos(radians);
-        const y2 = center + maxRadius * Math.sin(radians);
+      {/* Radial sector lines (10 sectors = 36° each) */}
+      {Array.from({ length: ROOM.sectors }).map((_, i) => {
+        const angleDeg = i * ROOM.sectorSizeDeg;
+        const outerPoint = polarToCartesian(center, center, maxRadius, angleDeg);
         return (
           <line
             key={`radial-${i}`}
             x1={center}
             y1={center}
-            x2={x2}
-            y2={y2}
+            x2={outerPoint.x}
+            y2={outerPoint.y}
             stroke="hsl(var(--muted-foreground))"
             strokeWidth="1"
             opacity="0.2"
@@ -79,24 +65,25 @@ export const CircularGrid: React.FC<CircularGridProps> = ({
       })}
 
       {/* Bench arcs */}
-      {benches.map((bench) => {
-        const startAngle = bench.center - benchArcSpan / 2;
-        const endAngle = bench.center + benchArcSpan / 2;
+      {ROOM.benches.map((bench) => {
+        const startPos = polarToCartesian(center, center, benchRadius, bench.startDeg);
+        const endPos = polarToCartesian(center, center, benchRadius, bench.endDeg);
         
-        const startPos = polarToCartesian(center, center, benchRadius, startAngle);
-        const endPos = polarToCartesian(center, center, benchRadius, endAngle);
+        const arcSpan = bench.endDeg - bench.startDeg;
+        const largeArcFlag = arcSpan > 180 ? 1 : 0;
         
-        const largeArcFlag = benchArcSpan > 180 ? 1 : 0;
-        
+        // SVG arc path: sweep flag = 0 for counter-clockwise (since Y is inverted in SVG)
         const pathData = [
           `M ${startPos.x} ${startPos.y}`,
-          `A ${benchRadius} ${benchRadius} 0 ${largeArcFlag} 1 ${endPos.x} ${endPos.y}`,
+          `A ${benchRadius} ${benchRadius} 0 ${largeArcFlag} 0 ${endPos.x} ${endPos.y}`,
         ].join(" ");
 
-        const labelPos = polarToCartesian(center, center, benchRadius + 20, bench.center);
+        // Label position at mid-angle, slightly outside the bench arc
+        const midAngle = (bench.startDeg + bench.endDeg) / 2;
+        const labelPos = polarToCartesian(center, center, benchRadius + 20, midAngle);
 
         return (
-          <g key={bench.label}>
+          <g key={bench.id}>
             {/* Bench arc */}
             <path
               d={pathData}
@@ -114,7 +101,7 @@ export const CircularGrid: React.FC<CircularGridProps> = ({
               className="text-xs font-semibold"
               fill={bench.color}
             >
-              {bench.label}
+              {bench.id}
             </text>
           </g>
         );
@@ -123,19 +110,5 @@ export const CircularGrid: React.FC<CircularGridProps> = ({
   );
 };
 
-/**
- * Helper function to convert angle (degrees) and radius to x, y coordinates
- * angleDeg: 0° = right (3 o'clock), grows counter-clockwise
- */
-export const polarToCartesian = (
-  centerX: number,
-  centerY: number,
-  radius: number,
-  angleDeg: number
-): { x: number; y: number } => {
-  const angleRad = ((angleDeg - 90) * Math.PI) / 180;
-  return {
-    x: centerX + radius * Math.cos(angleRad),
-    y: centerY + radius * Math.sin(angleRad),
-  };
-};
+// Re-export polarToCartesian for convenience
+export { polarToCartesian };
