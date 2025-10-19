@@ -42,31 +42,21 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
   // Persistent state that survives renders
   const dwellStatesRef = React.useRef<Map<string, DwellState>>(new Map());
   const rafRef = React.useRef<number>(0);
-  const lastFrameTimeRef = React.useRef<number>(performance.now());
-  const prevTimeSecRef = React.useRef<number>(0);
+  const prevTimeSecRef = React.useRef<number>(timeSec);
   const [, forceUpdate] = React.useState({});
   
   const center = size / 2;
   const maxRadius = size / 2 - 20;
 
-  // Reset on time jump (rewind)
+  // Main animation loop - reacts only to timeSec changes (position-based)
   React.useEffect(() => {
-    const dt = timeSec - prevTimeSecRef.current;
-    if (dt <= 0 || dt > 1) {
-      // Time jumped backwards or skipped - reset all states
-      dwellStatesRef.current.clear();
-      forceUpdate({});
-    }
-    prevTimeSecRef.current = timeSec;
-  }, [timeSec]);
-
-  // Main animation loop
-  React.useEffect(() => {
-    const animate = (now: number) => {
-      const dtSec = Math.max(0, (now - lastFrameTimeRef.current) / 1000);
-      lastFrameTimeRef.current = now;
+    const animate = () => {
+      // Use simulation time delta, not wall-clock time
+      const dtSec = timeSec - prevTimeSecRef.current;
       
+      // Only update if time advanced (skip if paused or jumped backward)
       if (dtSec > 0 && dtSec < 0.1) {
+        prevTimeSecRef.current = timeSec;
         const dwellStates = dwellStatesRef.current;
         
         peopleAtTime
@@ -170,6 +160,11 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
         });
         
         // Force re-render to show updated rings
+        forceUpdate({});
+      } else if (dtSec < 0 || dtSec > 1) {
+        // Time jumped backwards or skipped - reset all states
+        dwellStatesRef.current.clear();
+        prevTimeSecRef.current = timeSec;
         forceUpdate({});
       }
       
