@@ -8,64 +8,23 @@ interface UnifiedDwellProps {
 }
 
 interface DwellState {
+  intervalKey?: string;
   ringDiameterPx: number;
-  lastIntervalKey?: string;
 }
 
-type Sample = { tSec: number; angleDeg?: number; radiusFactor?: number; motion?: string };
+type CSVSample = {
+  tSec: number;
+  angleDeg?: number;
+  radiusFactor?: number;
+  motion?: string;
+};
 
-const DEFAULT_DIAM_PX = 5;
-const GROW_DIAM_PER_SEC = 3; // +3px diameter/sec
-const ANGLE_EPS = 0.5; // degrees
-const RADIUS_EPS = 0.002; // radiusFactor
+const DWELL_DEFAULT_DIAMETER_PX = 5;
+const DWELL_GROW_DIAM_PER_SEC = 3; // +3px diameter per second
+const STROKE_WIDTH_PX = 2;
 
-/**
- * Calculate shortest angular distance (wrap-aware)
- */
-function shortestAngularDelta(a: number, b: number): number {
-  return ((b - a + 540) % 360) - 180; // (-180, 180]
-}
-
-/**
- * Get bracketing samples A and B for current time
- */
-function getAB(
-  personId: string,
-  tSec: number,
-  csvPositions: Record<string, Sample[]> | null
-): { A?: Sample; B?: Sample } {
-  if (!csvPositions) return {};
-  const arr = csvPositions[personId];
-  if (!arr || arr.length < 2) return {};
-
-  let A: Sample | undefined, B: Sample | undefined;
-  for (let i = 0; i < arr.length - 1; i++) {
-    const a = arr[i], b = arr[i + 1];
-    if (a.tSec <= tSec && tSec <= b.tSec) {
-      A = a;
-      B = b;
-      break;
-    }
-  }
-  // If beyond last sample, use the last pair
-  if (!A && arr.length >= 2) {
-    A = arr[arr.length - 2];
-    B = arr[arr.length - 1];
-  }
-  return { A, B };
-}
-
-// Module-level persistent state (survives renders)
-const dwellMap = new Map<string, DwellState>();
-
-function getDwell(personId: string): DwellState {
-  let s = dwellMap.get(personId);
-  if (!s) {
-    s = { ringDiameterPx: DEFAULT_DIAM_PX };
-    dwellMap.set(personId, s);
-  }
-  return s;
-}
+// Module-level persistent state
+const dwellState = new Map<string, DwellState>();
 
 // rAF loop state
 let rafId: number | null = null;
@@ -73,100 +32,124 @@ let lastFrameTime = performance.now();
 let debugTimer = 0;
 
 /**
- * Update dwell for one person (interval-based: grow when A==B, snap when A!=B)
+ * Get interval motion for a person at a given time
  */
-function updateDwellForPerson(
+function getIntervalMotion(
   personId: string,
-  tSec: number,
+  timeSec: number,
+  csvPositions: Record<string, CSVSample[]> | null
+): { tA: number; tB: number; motion: 'STILL' | 'MOVING' } | null {
+  if (!csvPositions) return null;
+  const samples = csvPositions[personId];
+  if (!samples || samples.length < 2) return null;
+
+  // Find the current interval [tA, tB) where tA <= timeSec < tB
+  for (let i = 0; i < samples.length - 1; i++) {
+    const tA = samples[i].tSec;
+    const tB = samples[i + 1].tSec;
+    
+    if (tA <= timeSec && timeSec < tB) {
+      // Read motion from the sample at tA
+      const motion = samples[i].motion;
+      
+      // If motion is missing or blank, treat as MOVING
+      if (!motion || motion === '') {
+        return { tA, tB, motion: 'MOVING' };
+      }
+      
+      return {
+        tA,
+        tB,
+        motion: motion === 'STILL' ? 'STILL' : 'MOVING'
+      };
+    }
+  }
+
+  // If beyond last interval, use the last sample's interval
+  if (samples.length >= 2) {
+    const tA = samples[samples.length - 2].tSec;
+    const tB = samples[samples.length - 1].tSec;
+    const motion = samples[samples.length - 2].motion;
+    
+    if (!motion || motion === '') {
+      return { tA, tB, motion: 'MOVING' };
+    }
+    
+    return {
+      tA,
+      tB,
+      motion: motion === 'STILL' ? 'STILL' : 'MOVING'
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Update dwell for one person (motion column only)
+ */
+function updateDwell(
+  personId: string,
+  timeSec: number,
   dtSec: number,
-  csvPositions: Record<string, Sample[]> | null
+  csvPositions: Record<string, CSVSample[]> | null
 ): void {
-  const s = getDwell(personId);
-  const { A, B } = getAB(personId, tSec, csvPositions);
-  if (!A || !B) return;
+  const im = getIntervalMotion(personId, timeSec, csvPositions);
+  if (!im) return;
 
-  const intervalKey = `${A.tSec}-${B.tSec}`;
-
-  // Check if motion column is present and not blank
-  let INTERVAL_STILL: boolean;
+  const key = `${im.tA}-${im.tB}`;
+  let s = dwellState.get(personId);
   
-  if (A.motion && A.motion !== '') {
-    // Use explicit motion column if present
-    INTERVAL_STILL = A.motion === 'STILL';
+  if (!s) {
+    s = { ringDiameterPx: DWELL_DEFAULT_DIAMETER_PX };
+  }
+
+  // If we entered a new interval, reset to default diameter
+  if (s.intervalKey !== key) {
+    s.intervalKey = key;
+    s.ringDiameterPx = DWELL_DEFAULT_DIAMETER_PX;
+  }
+
+  // Apply growth or hold based on motion
+  if (im.motion === 'STILL') {
+    // Grow +3px diameter per second (unbounded)
+    s.ringDiameterPx += DWELL_GROW_DIAM_PER_SEC * dtSec;
   } else {
-    // Fall back to comparing angleDeg/radiusFactor with tolerances
-    const aA = A.angleDeg ?? 0;
-    const rA = A.radiusFactor ?? 0;
-    const aB = B.angleDeg ?? 0;
-    const rB = B.radiusFactor ?? 0;
-
-    const dAng = Math.abs(shortestAngularDelta(aA, aB));
-    const dRad = Math.abs(rB - rA);
-    INTERVAL_STILL = dAng <= ANGLE_EPS && dRad <= RADIUS_EPS;
+    // MOVING: fixed at default diameter
+    s.ringDiameterPx = DWELL_DEFAULT_DIAMETER_PX;
   }
 
-  // If we just entered a new MOVING interval, reset diameter to default
-  if (s.lastIntervalKey !== intervalKey && !INTERVAL_STILL) {
-    s.ringDiameterPx = DEFAULT_DIAM_PX;
-  }
-  s.lastIntervalKey = intervalKey;
-
-  if (INTERVAL_STILL) {
-    // Grow +3px/sec over this entire interval (unbounded)
-    s.ringDiameterPx += GROW_DIAM_PER_SEC * dtSec;
-  } else {
-    // MOVING: hold at default for entire interval
-    s.ringDiameterPx = DEFAULT_DIAM_PX;
-  }
+  dwellState.set(personId, s);
 }
 
 /**
  * Debug logging (once per second for P01)
  */
-function debugDwell(dtSec: number, tSec: number, csvPositions: Record<string, Sample[]> | null): void {
+function debugDwell(
+  dtSec: number,
+  timeSec: number,
+  csvPositions: Record<string, CSVSample[]> | null
+): void {
   debugTimer += dtSec;
   if (debugTimer < 1) return;
   debugTimer = 0;
 
-  const { A, B } = getAB('P01', tSec, csvPositions);
-  const d = dwellMap.get('P01');
-  if (A && B && d) {
-    const aA = A.angleDeg ?? 0;
-    const rA = A.radiusFactor ?? 0;
-    const aB = B.angleDeg ?? 0;
-    const rB = B.radiusFactor ?? 0;
-
-    const dAng = Math.abs(shortestAngularDelta(aA, aB));
-    const dRad = Math.abs(rB - rA);
-    
-    let still: boolean;
-    let motionSource: string;
-    
-    if (A.motion && A.motion !== '') {
-      still = A.motion === 'STILL';
-      motionSource = `motion=${A.motion}`;
-    } else {
-      still = dAng <= ANGLE_EPS && dRad <= RADIUS_EPS;
-      motionSource = 'calculated';
-    }
-
+  const im = getIntervalMotion('P01', timeSec, csvPositions);
+  const s = dwellState.get('P01');
+  
+  if (im && s) {
     console.log('[Dwell][P01]', {
-      tSec: tSec.toFixed(1),
-      dAng: dAng.toFixed(3),
-      dRad: dRad.toFixed(4),
-      still: still,
-      motionSource: motionSource,
-      diameter: d.ringDiameterPx.toFixed(2),
-      interval: `${A.tSec}-${B.tSec}`,
-      angles: `${aA.toFixed(1)} → ${aB.toFixed(1)}`,
-      radii: `${rA.toFixed(3)} → ${rB.toFixed(3)}`
+      tSec: timeSec.toFixed(1),
+      interval: `${im.tA}-${im.tB}`,
+      motion: im.motion,
+      diameter: s.ringDiameterPx.toFixed(2)
     });
   }
 }
 
 /**
  * Layer 2: Dwell Time - Shows growing rings around stationary people
- * Rings grow at +3px diameter/sec when keyframe A == keyframe B (INTERVAL_STILL)
+ * Rings grow at +3px diameter/sec when motion=STILL, fixed at 5px when motion=MOVING
  */
 export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
   const peopleAtTime = usePeoplePlaybackStore((state) => state.peopleAtTime);
@@ -185,17 +168,19 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
 
       if (dtSec > 0 && dtSec < 0.1) {
         // Update all dwell states
-        const activePeople = peopleAtTime.filter(p => p.isVisible && p.currentRadiusFactor <= 1.0);
+        const activePeople = peopleAtTime.filter(
+          (p) => p.isVisible && p.currentRadiusFactor <= 1.0
+        );
 
         activePeople.forEach((person) => {
-          updateDwellForPerson(person.id, timeSec, dtSec, csvPositions);
+          updateDwell(person.id, timeSec, dtSec, csvPositions);
         });
 
         // Remove states for people no longer visible
-        const visibleIds = new Set(activePeople.map(p => p.id));
-        Array.from(dwellMap.keys()).forEach(id => {
+        const visibleIds = new Set(activePeople.map((p) => p.id));
+        Array.from(dwellState.keys()).forEach((id) => {
           if (!visibleIds.has(id)) {
-            dwellMap.delete(id);
+            dwellState.delete(id);
           }
         });
 
@@ -236,8 +221,8 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
                 person.currentAngleDeg
               );
 
-              const state = dwellMap.get(person.id);
-              const ringDiameter = state?.ringDiameterPx || DEFAULT_DIAM_PX;
+              const state = dwellState.get(person.id);
+              const ringDiameter = state?.ringDiameterPx || DWELL_DEFAULT_DIAMETER_PX;
               const ringRadius = ringDiameter / 2;
 
               if (ringRadius <= 0) return null;
@@ -250,7 +235,7 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
                   r={ringRadius}
                   fill="none"
                   stroke={person.color}
-                  strokeWidth="2"
+                  strokeWidth={STROKE_WIDTH_PX}
                   strokeOpacity="0.9"
                 />
               );
