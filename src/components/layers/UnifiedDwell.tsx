@@ -8,96 +8,111 @@ import { usePeoplePlaybackStore } from "@/lib/usePeoplePlaybackStore";
 const dlog = (...a: any[]) => { if ((window as any).DEBUG_DWELL) console.log('[DWELL]', ...a); };
 
 // ====== CONSTANTS ======
-const DWELL_DEFAULT_DIAM = 10;  // visible size during MOVING
-const DWELL_GROW_DIAM_PER_SEC = 10;  // +10px diameter per second while STILL
+const DWELL_DEFAULT_DIAM = 10;   // px - baseline ring diameter
+const DWELL_GROW_PER_SEC = 10;   // px (diameter) per second during STILL
 const DWELL_STROKE_WIDTH = 2;
-const INTERVAL_EPS = 1e-6; // Epsilon to avoid edge flicker at exact boundaries
 
 // ====== TYPES ======
-type CSVRow = { tSec: number; motion?: string; angleDeg?: number; radiusFactor?: number; bench?: string };
-type Interval = { tA: number; tB: number; rowA: CSVRow; rowB: CSVRow; motion: 'STILL' | 'MOVING' };
-type DwellState = { lastKey?: string; diamPx: number; lastTimeSec: number };
+type MotionState = 'STILL' | 'MOVING';
+type MotionInterval = { tA: number; tB: number; timeLabel?: string; motion: MotionState };
+type MotionSchedule = Record<string /*personId*/, MotionInterval[]>;
+type DwellState = { lastKey?: string; diamPx: number };
 
 // ====== STATE (PERSISTENT) ======
 const dwellStates = new Map<string, DwellState>();
-let csvNormalized = false;
-let lastFrameTime = 0;
+let motionSchedule: MotionSchedule | null = null;
+let scheduleInitialized = false;
 
-// ====== HELPERS ======
-function normMotion(m?: string): 'STILL' | 'MOVING' {
-  return (m && m.trim().toUpperCase() === 'STILL') ? 'STILL' : 'MOVING';
-}
-
-function assertCsvReady(csvPositions: Record<string, CSVRow[]> | null): boolean {
-  if (!csvPositions) { dlog('csvPositions is NULL'); return false; }
-  const keys = Object.keys(csvPositions);
-  if (keys.length === 0) { dlog('csvPositions has NO KEYS'); return false; }
-  
-  // normalize & sort once
-  if (!csvNormalized) {
-    keys.forEach(k => {
-      const arr = csvPositions[k] || [];
-      arr.sort((a, b) => (a.tSec || 0) - (b.tSec || 0));
-      arr.forEach(r => r.motion = normMotion(r.motion));
-    });
-    dlog('✅ CSV normalized. Keys:', keys.slice(0, 8).map(k => `${k}:${csvPositions[k]?.length || 0}`));
-    csvNormalized = true;
-  }
-  return true;
+// ====== MOTION SCHEDULE BUILDER ======
+function normalizeMotion(m?: string): MotionState {
+  if (!m) return 'MOVING';
+  const v = m.trim().toUpperCase();
+  return v === 'STILL' ? 'STILL' : 'MOVING';
 }
 
 /**
- * Unified interval lookup: maps timeSec → current CSV interval [tA, tB) for a person
- * The motion value at tA applies to the entire interval [tA, tB)
+ * Build motion schedule from CSV data.
+ * Each row at tSec = T defines the motion state for interval [T, T+10).
+ * Contract: motion column is authoritative (STILL or MOVING).
  */
-function getInterval(personId: string, timeSec: number, map: Record<string, CSVRow[]> | null): Interval | null {
-  if (!map) return null;
-  const rows = map[personId];
-  if (!rows || rows.length < 2) return null;
-
-  for (let i = 0; i < rows.length - 1; i++) {
-    const A = rows[i], B = rows[i + 1];
-    if (timeSec + INTERVAL_EPS >= A.tSec && timeSec < B.tSec - INTERVAL_EPS) {
-      return { tA: A.tSec, tB: B.tSec, rowA: A, rowB: B, motion: normMotion(A.motion) };
+function buildMotionSchedule(csvPositions: Record<string, any[]>): MotionSchedule {
+  const schedule: MotionSchedule = {};
+  
+  for (const personId in csvPositions) {
+    const rows = csvPositions[personId];
+    if (!rows || rows.length === 0) continue;
+    
+    // Sort by tSec
+    const sorted = [...rows].sort((a, b) => (a.tSec || 0) - (b.tSec || 0));
+    
+    const intervals: MotionInterval[] = [];
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const A = sorted[i];
+      const B = sorted[i + 1];
+      intervals.push({
+        tA: Number(A.tSec),
+        tB: Number(B.tSec),
+        timeLabel: A.time ? String(A.time) : undefined,
+        motion: normalizeMotion(A.motion),
+      });
     }
+    schedule[personId] = intervals;
   }
   
-  // clamp before-first / after-last
-  const A = rows[rows.length - 2], B = rows[rows.length - 1];
-  return { tA: A.tSec, tB: B.tSec, rowA: A, rowB: B, motion: normMotion(A.motion) };
+  return schedule;
 }
 
 /**
- * Update dwell for one person
- * Default ring diameter = 10px
- * During MOVING interval: ring stays 10px
- * During STILL interval: ring grows +10px/sec (unbounded), continuing across consecutive STILL intervals
+ * Get current motion interval for a person at timeSec.
+ * Returns the interval [tA, tB) where tA <= timeSec < tB.
  */
-function updateDwell(personId: string, timeSec: number, dtSec: number, map: Record<string, CSVRow[]> | null) {
-  const iv = getInterval(personId, timeSec, map);
+function getCurrentInterval(personId: string, timeSec: number, sched: MotionSchedule): MotionInterval | null {
+  const list = sched[personId];
+  if (!list || list.length === 0) return null;
+  
+  // Find interval where tA <= timeSec < tB
+  for (let i = 0; i < list.length; i++) {
+    const iv = list[i];
+    if (timeSec >= iv.tA && timeSec < iv.tB) return iv;
+  }
+  
+  // Clamp to last interval if beyond
+  return list[list.length - 1];
+}
+
+/**
+ * Update dwell state for a person based on motion schedule.
+ * MOVING interval: diameter = 10px
+ * STILL interval: diameter grows +10px/sec (unbounded), continues across consecutive STILL intervals
+ */
+function updateDwellState(personId: string, timeSec: number, dtSec: number, sched: MotionSchedule) {
+  const iv = getCurrentInterval(personId, timeSec, sched);
   if (!iv) return;
   
   const key = `${iv.tA}-${iv.tB}`;
-  const s = dwellStates.get(personId) ?? { diamPx: DWELL_DEFAULT_DIAM, lastTimeSec: timeSec };
-
-  if (s.lastKey !== key) {
-    s.lastKey = key;
-    if (iv.motion === 'MOVING') s.diamPx = DWELL_DEFAULT_DIAM; // baseline on moving window
-    // if STILL, do not reset; continue growth across STILL→STILL
+  const state = dwellStates.get(personId) ?? { diamPx: DWELL_DEFAULT_DIAM };
+  
+  // On entering a new interval
+  if (state.lastKey !== key) {
+    state.lastKey = key;
     
-    dlog('🔄 ENTER interval', personId, { key, motion: iv.motion, diam: s.diamPx.toFixed(1), timeSec: timeSec.toFixed(2) });
+    // Reset to baseline only when entering a MOVING interval
+    if (iv.motion === 'MOVING') {
+      state.diamPx = DWELL_DEFAULT_DIAM;
+    }
+    // For STILL intervals, keep diameter (allows continuity across consecutive STILL intervals)
+    
+    dlog('🔄 ENTER', personId, iv.motion, `[${iv.tA}-${iv.tB})`, `${state.diamPx.toFixed(1)}px`, iv.timeLabel || '');
   }
-
-  // Apply rule
+  
+  // Apply growth rule
   if (iv.motion === 'STILL') {
-    s.diamPx += DWELL_GROW_DIAM_PER_SEC * dtSec;
-    dlog('📈 GROW', personId, { diam: s.diamPx.toFixed(1), dtSec: dtSec.toFixed(4), timeSec: timeSec.toFixed(2) });
+    state.diamPx += DWELL_GROW_PER_SEC * dtSec;  // +10px/s, unbounded
   } else {
-    s.diamPx = DWELL_DEFAULT_DIAM;
+    state.diamPx = DWELL_DEFAULT_DIAM;  // locked at 10px during MOVING
   }
-
-  s.lastTimeSec = timeSec;
-  dwellStates.set(personId, s);
+  
+  dwellStates.set(personId, state);
 }
 
 interface UnifiedDwellProps {
@@ -106,15 +121,35 @@ interface UnifiedDwellProps {
 
 /**
  * Layer 2: Dwell Time - Shows growing rings around stationary people
- * Unified with global timeSec: 10 seconds on timer = 1 CSV interval
+ * CSV-motion-driven only. No heuristics. Pure motion schedule logic.
  */
 export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
   const peopleAtTime = usePeoplePlaybackStore((state) => state.peopleAtTime);
   const timeSec = usePeoplePlaybackStore((state) => state.timeSec);
   const csvPositions = usePeoplePlaybackStore((state) => state.csvPositions);
+  
+  const [lastFrameTime, setLastFrameTime] = React.useState(0);
 
   const center = size / 2;
   const maxRadius = size / 2 - 20;
+
+  // Initialize motion schedule once (one-time setup)
+  React.useEffect(() => {
+    if (!csvPositions || scheduleInitialized) return;
+    
+    motionSchedule = buildMotionSchedule(csvPositions);
+    scheduleInitialized = true;
+    
+    const ids = Object.keys(motionSchedule);
+    dlog('✅ Motion schedule built:', ids.length, 'people');
+    
+    // Log first person's schedule as example
+    if (ids.length > 0) {
+      const firstId = ids[0];
+      const firstSched = motionSchedule[firstId].slice(0, 3);
+      dlog(`   ${firstId}:`, firstSched);
+    }
+  }, [csvPositions]);
 
   // Setup dev helpers and visual probe (once)
   React.useEffect(() => {
@@ -126,7 +161,7 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
       console.log('[TIME] ⏭️  Jumped to', clamped, 'seconds');
     };
     (window as any).start = () => (window as any).jumpTo(0);
-    (window as any).mid = () => (window as any).jumpTo(30);
+    (window as any).mid = () => (window as any).jumpTo(90);
     (window as any).end = () => (window as any).jumpTo(usePeoplePlaybackStore.getState().durationSec ?? 180);
 
     // Keyboard shortcut: R to rewind
@@ -138,7 +173,7 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
     // Visual probe overlay
     const probeEl = document.createElement('div');
     probeEl.id = 'dwell-probe';
-    probeEl.style.cssText = 'position:fixed;left:16px;bottom:16px;background:rgba(0,0,0,.8);color:#0f0;padding:8px 12px;border-radius:6px;font:11px/1.4 "Courier New",monospace;pointer-events:none;z-index:9999;border:1px solid #0f0';
+    probeEl.style.cssText = 'position:fixed;left:16px;bottom:16px;background:rgba(0,0,0,.8);color:#0f0;padding:8px 12px;border-radius:6px;font:11px/1.4 "Courier New",monospace;pointer-events:none;z-index:9999;border:1px solid #0f0;max-width:300px';
     document.body.appendChild(probeEl);
 
     return () => {
@@ -148,66 +183,54 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
     };
   }, []);
 
-  // Update dwell states every render (driven by global timeSec changes)
+  // Update dwell states every frame (driven by global timeSec)
   React.useEffect(() => {
-    if (!csvPositions || !assertCsvReady(csvPositions)) return;
+    if (!motionSchedule) return;
 
-    const now = timeSec;
-    const dtSec = lastFrameTime > 0 ? Math.max(0, now - lastFrameTime) : 0;
-    lastFrameTime = now;
+    const dtSec = lastFrameTime > 0 ? Math.max(0, timeSec - lastFrameTime) : 0;
+    setLastFrameTime(timeSec);
 
-    // Update ALL people from CSV
-    const ids = Object.keys(csvPositions);
+    // Update all people from motion schedule
+    const personIds = Object.keys(motionSchedule);
     
-    for (const id of ids) {
-      updateDwell(id, timeSec, dtSec, csvPositions);
+    for (const personId of personIds) {
+      updateDwellState(personId, timeSec, dtSec, motionSchedule);
     }
 
-    // Log summary of ALL people growing (once per second)
-    if ((window as any).DEBUG_DWELL && Math.floor(timeSec) !== Math.floor(timeSec - dtSec)) {
-      const growingPeople = ids
-        .map(id => {
-          const s = dwellStates.get(id);
-          const iv = getInterval(id, timeSec, csvPositions);
-          return { id, diam: s?.diamPx || 10, motion: iv?.motion };
-        })
-        .filter(p => p.motion === 'STILL');
-      
-      if (growingPeople.length > 0) {
-        dlog('🌱 GROWING (' + growingPeople.length + ' people):', 
-          growingPeople.slice(0, 5).map(p => `${p.id}:${p.diam.toFixed(0)}px`).join(', '),
-          growingPeople.length > 5 ? '...' : ''
-        );
-      }
-    }
-
-    // Update visual probe - show ALL growing people
+    // Update visual probe
     const probeEl = document.getElementById('dwell-probe');
     if (probeEl) {
-      const allStates = ids.map(id => {
-        const iv = getInterval(id, timeSec, csvPositions);
+      const allStates = personIds.map(id => {
+        const iv = getCurrentInterval(id, timeSec, motionSchedule!);
         const s = dwellStates.get(id);
         return { id, iv, s };
       }).filter(p => p.iv && p.s);
 
       const stillPeople = allStates.filter(p => p.iv!.motion === 'STILL');
+      const movingPeople = allStates.filter(p => p.iv!.motion === 'MOVING');
       const mm = Math.floor(timeSec / 60);
       const ss = Math.floor(timeSec % 60);
       
       const p01Data = allStates.find(p => p.id === 'P01');
       
-      probeEl.innerHTML = `<strong>Dwell Debug (${stillPeople.length} STILL)</strong><br/>` +
-        `time: ${mm}:${ss.toString().padStart(2,'0')}<br/>` +
-        (p01Data && p01Data.iv ? 
-          `P01: <strong>${p01Data.iv.motion}</strong> ${p01Data.s!.diamPx.toFixed(1)}px [${p01Data.iv.tA}-${p01Data.iv.tB}]<br/>` : '') +
-        `Growing: ${stillPeople.slice(0, 4).map(p => `${p.id}:${p.s!.diamPx.toFixed(0)}px`).join(', ')}${stillPeople.length > 4 ? '...' : ''}`;
+      probeEl.innerHTML = `<strong>Dwell (${stillPeople.length} STILL, ${movingPeople.length} MOVING)</strong><br/>` +
+        `time: ${mm}:${ss.toString().padStart(2,'0')} (${timeSec.toFixed(1)}s)<br/>` +
+        (p01Data?.iv ? 
+          `P01: <strong>${p01Data.iv.motion}</strong> ${p01Data.s!.diamPx.toFixed(1)}px [${p01Data.iv.tA}-${p01Data.iv.tB}) ${p01Data.iv.timeLabel || ''}<br/>` : '') +
+        (stillPeople.length > 0 ? 
+          `Growing: ${stillPeople.slice(0, 4).map(p => `${p.id}:${p.s!.diamPx.toFixed(0)}px`).join(', ')}${stillPeople.length > 4 ? ` +${stillPeople.length - 4} more` : ''}` : 
+          'No one STILL');
     }
 
-    // Log once per second
-    if ((window as any).DEBUG_DWELL && Math.floor(timeSec) % 1 === 0 && Math.random() < 0.1) {
-      dlog('⏱️  timeSec =', timeSec.toFixed(2));
+    // Log periodic summary
+    if ((window as any).DEBUG_DWELL && Math.floor(timeSec) !== Math.floor(lastFrameTime) && Math.floor(timeSec) % 5 === 0) {
+      const stillCount = personIds.filter(id => {
+        const iv = getCurrentInterval(id, timeSec, motionSchedule!);
+        return iv?.motion === 'STILL';
+      }).length;
+      dlog(`⏱️  t=${timeSec.toFixed(1)}s: ${stillCount} STILL, ${personIds.length - stillCount} MOVING`);
     }
-  }, [timeSec, csvPositions]);
+  }, [timeSec, lastFrameTime]);
 
   return (
     <div className="relative" style={{ width: size, height: size }}>
