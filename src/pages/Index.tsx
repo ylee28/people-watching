@@ -268,6 +268,18 @@ const Index = () => {
                   yOffset = (idx - 2) * (ovalHeight + gap);
                   containerHeight = ovalHeight;
                 }
+                
+                // Label position for exploded view - 100px to the left, vertically centered
+                const labelStyle = introMode === "exploded" ? {
+                  position: 'absolute' as const,
+                  left: -100,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  whiteSpace: 'nowrap' as const,
+                  pointerEvents: 'none' as const
+                } : undefined;
 
                 // Unique clipPath ID for each layer
                 const clipId = `oval-clip-${layer}`;
@@ -295,6 +307,11 @@ const Index = () => {
                     goToLayer(layer);
                   }
                 }}>
+                        {/* Layer label - 100px to the left in exploded view */}
+                        {introMode === "exploded" && labelStyle && (
+                          <div style={labelStyle}>{layerLabels[layer]}</div>
+                        )}
+                        
                         {introMode === "exploded" ?
                   // Render live layer visualization in thin oval (with scaleY transform)
                   <svg width={ovalWidth} height={ovalHeight} viewBox={`0 0 ${ovalWidth} ${ovalHeight}`} style={{
