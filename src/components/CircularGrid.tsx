@@ -39,8 +39,8 @@ export const CircularGrid: React.FC<CircularGridProps> = ({
             cy={center}
             r={radius}
             fill="none"
-            stroke="hsl(var(--foreground))"
-            strokeWidth="4"
+            stroke="#CFBD94"
+            strokeWidth="1"
             strokeDasharray="8 8"
             opacity="0.15"
           />
@@ -58,8 +58,8 @@ export const CircularGrid: React.FC<CircularGridProps> = ({
             y1={center}
             x2={outerPoint.x}
             y2={outerPoint.y}
-            stroke="hsl(var(--foreground))"
-            strokeWidth="4"
+            stroke="#CFBD94"
+            strokeWidth="1"
             strokeDasharray="8 8"
             opacity="0.15"
           />
