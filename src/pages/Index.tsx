@@ -85,18 +85,11 @@ const Index = () => {
     }
   };
 
-  // Keyboard support: Esc to return to overlapped, H to toggle debug
+  // Keyboard support: Esc to return to overlapped
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && introMode === "exploded") {
         setIntroMode("overlapped");
-      }
-      if (e.key === "h" || e.key === "H") {
-        // Toggle debug panel visibility
-        const probeEl = document.getElementById('dwell-probe');
-        if (probeEl) {
-          probeEl.style.display = probeEl.style.display === 'none' ? 'block' : 'none';
-        }
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -129,7 +122,7 @@ const Index = () => {
   return <div className="min-h-screen bg-background p-4 md:p-8 relative">
       {/* Timer and timeline controls at top center */}
       <div className="max-w-7xl mx-auto space-y-4" style={{
-      marginBottom: '50px'
+      marginBottom: '25px'
     }}>
         <div className="flex justify-center">
           <Timer />
@@ -200,8 +193,8 @@ const Index = () => {
 
       {/* Main visualization area - full viewport to prevent cutoff */}
       <div className="w-full h-[calc(100vh-300px)] flex justify-center items-center gap-8 overflow-visible">
-        {/* Layer navigation buttons - beside the grid, not overlaying */}
-        {viewMode === "intro" && <div className="hidden lg:block flex-shrink-0">
+        {/* Layer navigation buttons - beside the grid, only in exploded view */}
+        {viewMode === "intro" && introMode === "exploded" && <div className="hidden lg:block flex-shrink-0">
             <LayerNavButtons onSelect={goToLayer} activeLayer={selectedLayer} layout="vertical" />
           </div>}
         
@@ -214,10 +207,10 @@ const Index = () => {
         }} exit={{
           opacity: 0
         }} className="relative flex flex-col items-center gap-6">
-              {/* Mobile buttons - above grid */}
-              <div className="lg:hidden w-full max-w-md">
+              {/* Mobile buttons - above grid, only in exploded view */}
+              {introMode === "exploded" && <div className="lg:hidden w-full max-w-md">
                 <LayerNavButtons onSelect={goToLayer} activeLayer={selectedLayer} layout="horizontal" />
-              </div>
+              </div>}
               
               <div className="relative" style={{
             perspective: "none"
@@ -276,7 +269,7 @@ const Index = () => {
                   left: '-100px',
                   top: '50%',
                   transform: 'translateY(-50%)',
-                  fontSize: '14px',
+                  fontSize: '21px',
                   fontFamily: 'PP Mori, sans-serif',
                   whiteSpace: 'nowrap' as const,
                   pointerEvents: 'none' as const,

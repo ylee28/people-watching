@@ -26,11 +26,11 @@ export const LayerNavButtons: React.FC<LayerNavButtonsProps> = ({
   layout = "vertical"
 }) => {
   const layers: LayerType[] = ["colors", "dwell", "notes", "movement", "coverage"];
-  return <div className={`flex ${layout === "vertical" ? "flex-col gap-[100px]" : "flex-row gap-2 overflow-x-auto pb-2"}`} style={{ marginLeft: '-400px' }}>
+  return <div className={`flex ${layout === "vertical" ? "flex-col gap-[90px]" : "flex-row gap-2 overflow-x-auto pb-2"}`} style={{ marginLeft: '-400px' }}>
       {layers.map(layer => {
       const isActive = activeLayer === layer;
       return <button key={layer} onClick={() => onSelect(layer)} className="font-mori cursor-pointer hover:opacity-70 transition-opacity" style={{
-              fontSize: '14px',
+              fontSize: '21px',
               color: '#CFBD94',
               background: 'none',
               border: 'none',
