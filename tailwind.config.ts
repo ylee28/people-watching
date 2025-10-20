@@ -13,6 +13,11 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        'beretta': ['Beretta Sans', 'sans-serif'],
+        'ppmori': ['PP Mori', 'sans-serif'],
+        'tiny': ['TINY 5x3', 'monospace'],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

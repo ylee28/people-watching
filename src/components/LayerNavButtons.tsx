@@ -33,7 +33,7 @@ export const LayerNavButtons: React.FC<LayerNavButtonsProps> = ({
         <div
           key={layer}
           onClick={() => onSelect(layer)}
-          className="text-foreground font-medium cursor-pointer hover:opacity-70 transition-opacity"
+          className="text-foreground font-ppmori cursor-pointer hover:opacity-70 transition-opacity"
         >
           {layerLabels[layer]}
         </div>

@@ -4,6 +4,15 @@ import { polarToCartesian } from "@/lib/roomGeometry";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { usePeoplePlaybackStore } from "@/lib/usePeoplePlaybackStore";
+import p1Image from "@/assets/p1.png";
+import p2Image from "@/assets/p2.png";
+import p3Image from "@/assets/p3.png";
+import p4Image from "@/assets/p4.png";
+import p5Image from "@/assets/p5.png";
+import p6Image from "@/assets/p6.png";
+import p7Image from "@/assets/p7.png";
+import p8Image from "@/assets/p8.png";
+import p9Image from "@/assets/p9.png";
 
 interface UnifiedColorsProps {
   size?: number;
@@ -31,6 +40,19 @@ export const UnifiedColors: React.FC<UnifiedColorsProps> = ({ size = 520 }) => {
   
   const center = size / 2;
   const maxRadius = size / 2 - 20;
+
+  // Map person IDs to their images
+  const personImages: Record<string, string> = {
+    'p1': p1Image,
+    'p2': p2Image,
+    'p3': p3Image,
+    'p4': p4Image,
+    'p5': p5Image,
+    'p6': p6Image,
+    'p7': p7Image,
+    'p8': p8Image,
+    'p9': p9Image,
+  };
 
   // Animate enter/exit
   React.useEffect(() => {
@@ -153,21 +175,37 @@ export const UnifiedColors: React.FC<UnifiedColorsProps> = ({ size = 520 }) => {
                 person.currentAngleDeg
               );
               const isHovered = hoveredId === person.id;
+              const imageUrl = personImages[person.id.toLowerCase()];
+              const imageSize = isHovered ? 20 : 16;
 
               return (
                 <g key={person.id} opacity={opacity}>
-                  <motion.circle
-                    cx={coord.x}
-                    cy={coord.y}
-                    r={isHovered ? 10 : 8}
-                    fill={person.color}
-                    stroke="#fff"
-                    strokeWidth="2"
-                    style={{ cursor: "pointer" }}
-                    onMouseEnter={() => setHoveredId(person.id)}
-                    onMouseLeave={() => setHoveredId(null)}
-                    onClick={() => navigate(`/person/${person.id}`)}
-                  />
+                  {imageUrl ? (
+                    <image
+                      href={imageUrl}
+                      x={coord.x - imageSize / 2}
+                      y={coord.y - imageSize / 2}
+                      width={imageSize}
+                      height={imageSize}
+                      style={{ cursor: "pointer" }}
+                      onMouseEnter={() => setHoveredId(person.id)}
+                      onMouseLeave={() => setHoveredId(null)}
+                      onClick={() => navigate(`/person/${person.id}`)}
+                    />
+                  ) : (
+                    <motion.circle
+                      cx={coord.x}
+                      cy={coord.y}
+                      r={isHovered ? 10 : 8}
+                      fill={person.color}
+                      stroke="#fff"
+                      strokeWidth="2"
+                      style={{ cursor: "pointer" }}
+                      onMouseEnter={() => setHoveredId(person.id)}
+                      onMouseLeave={() => setHoveredId(null)}
+                      onClick={() => navigate(`/person/${person.id}`)}
+                    />
+                  )}
                   {isHovered && (
                     <g>
                       <rect
@@ -185,7 +223,7 @@ export const UnifiedColors: React.FC<UnifiedColorsProps> = ({ size = 520 }) => {
                         fill="#fff"
                         fontSize="12"
                       >
-                        {person.color}
+                        {person.id}
                       </text>
                     </g>
                   )}

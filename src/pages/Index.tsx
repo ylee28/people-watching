@@ -85,11 +85,18 @@ const Index = () => {
     }
   };
 
-  // Keyboard support: Esc to return to overlapped
+  // Keyboard support: Esc to return to overlapped, H to toggle debug
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && introMode === "exploded") {
         setIntroMode("overlapped");
+      }
+      if (e.key === "h" || e.key === "H") {
+        // Toggle debug panel visibility
+        const probeEl = document.getElementById('dwell-probe');
+        if (probeEl) {
+          probeEl.style.display = probeEl.style.display === 'none' ? 'block' : 'none';
+        }
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -132,18 +139,20 @@ const Index = () => {
       <div className="max-w-7xl mx-auto mb-8 space-y-4">
         <div className="flex flex-wrap gap-4 items-center justify-between">
           <div className="flex gap-2">
-            <Button variant={viewMode === "intro" ? "default" : "outline"} onClick={() => {
-            setViewMode("intro");
-            setIntroMode("overlapped");
-          }} size="sm">
-              Intro
-            </Button>
-            {viewMode === "focus" && <Button variant="outline" onClick={handleBack} size="sm">
-                Back
-              </Button>}
-            {introMode === "exploded" && viewMode === "intro" && <Button variant="outline" onClick={handleBackgroundClick} size="sm">
-                Back to Overlapped
-              </Button>}
+            {viewMode === "focus" && <div 
+                onClick={handleBack} 
+                className="font-tiny cursor-pointer hover:opacity-70 transition-opacity text-foreground"
+                style={{ fontSize: '100pt', lineHeight: '1' }}
+              >
+                &lt;
+              </div>}
+            {introMode === "exploded" && viewMode === "intro" && <div 
+                onClick={handleBackgroundClick} 
+                className="font-tiny cursor-pointer hover:opacity-70 transition-opacity text-foreground"
+                style={{ fontSize: '100pt', lineHeight: '1' }}
+              >
+                &lt;
+              </div>}
           </div>
 
           {/* Intro Style Reference (Intro only) */}
@@ -200,8 +209,8 @@ const Index = () => {
         </div>
       </div>
 
-      {/* Main visualization area */}
-      <div className="max-w-7xl mx-auto flex justify-center items-center min-h-[600px] gap-8">
+      {/* Main visualization area - full viewport to prevent cutoff */}
+      <div className="w-full h-[calc(100vh-300px)] flex justify-center items-center gap-8 overflow-visible">
         {/* Layer navigation buttons - beside the grid, not overlaying */}
         {viewMode === "intro" && <div className="hidden lg:block flex-shrink-0">
             <LayerNavButtons onSelect={goToLayer} activeLayer={selectedLayer} layout="vertical" />
@@ -272,13 +281,14 @@ const Index = () => {
                   containerHeight = ovalHeight;
                 }
                 
-                // Label position for exploded view - 300px to the left of leftmost edge, 600px vertical spacing
+                // Label position for exploded view - 300px to the left of leftmost edge
                 const labelStyle = introMode === "exploded" ? {
                   position: 'absolute' as const,
-                  left: -(ovalWidth / 2 + 300),
-                  top: idx * 600,
+                  left: -300,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
                   fontSize: '14px',
-                  fontWeight: 500,
+                  fontFamily: 'PP Mori, sans-serif',
                   whiteSpace: 'nowrap' as const,
                   pointerEvents: 'none' as const
                 } : undefined;

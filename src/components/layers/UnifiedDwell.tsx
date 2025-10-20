@@ -248,13 +248,25 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
     // Visual probe overlay
     const probeEl = document.createElement('div');
     probeEl.id = 'dwell-probe';
-    probeEl.style.cssText = 'position:fixed;left:16px;bottom:16px;background:rgba(0,0,0,.8);color:#0f0;padding:8px 12px;border-radius:6px;font:11px/1.4 "Courier New",monospace;pointer-events:none;z-index:9999;border:1px solid #0f0;max-width:380px';
+    probeEl.style.cssText = 'position:fixed;left:16px;bottom:16px;background:rgba(0,0,0,.8);color:#0f0;padding:8px 12px;border-radius:6px;font:11px/1.4 "Courier New",monospace;pointer-events:none;z-index:9999;border:1px solid #0f0;max-width:380px;display:block';
     document.body.appendChild(probeEl);
+
+    // Listen to visibility toggle from Index
+    const toggleDebug = () => {
+      const probe = document.getElementById('dwell-probe');
+      if (probe) {
+        const currentDisplay = window.getComputedStyle(probe).display;
+        probe.style.display = currentDisplay === 'none' ? 'block' : 'none';
+      }
+    };
+    
+    window.addEventListener('toggleDebugPanel', toggleDebug);
 
     return () => {
       const existing = document.getElementById('dwell-probe');
       if (existing) existing.remove();
       window.removeEventListener('keydown', handleKeydown);
+      window.removeEventListener('toggleDebugPanel', toggleDebug);
     };
   }, []);
 
@@ -317,7 +329,7 @@ export const UnifiedDwell: React.FC<UnifiedDwellProps> = ({ size = 520 }) => {
                   cy={coord.y}
                   r={ringRadius}
                   fill="none"
-                  stroke={person.color}
+                  stroke="#CFBD94"
                   strokeWidth={DWELL_STROKE}
                   strokeOpacity={0.9}
                   vectorEffect="non-scaling-stroke"
