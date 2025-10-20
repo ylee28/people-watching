@@ -176,7 +176,7 @@ export const UnifiedColors: React.FC<UnifiedColorsProps> = ({ size = 520 }) => {
               );
               const isHovered = hoveredId === person.id;
               const imageUrl = avatarSrcFor(person.id);
-              const imageSize = isHovered ? 24 : 20;
+              const imageSize = isHovered ? 48 : 40;
 
               return (
                 <g key={person.id} opacity={opacity}>

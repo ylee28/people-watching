@@ -17,11 +17,11 @@ type ViewMode = "intro" | "focus";
 type IntroMode = "overlapped" | "exploded";
 type LayerType = "colors" | "dwell" | "notes" | "movement" | "coverage";
 const layerLabels: Record<LayerType, string> = {
-  colors: "Colors",
+  colors: "Color",
   dwell: "Dwell Time",
   notes: "Notes",
   movement: "Path",
-  coverage: "Item"
+  coverage: "Other"
 };
 const Index = () => {
   const [viewMode, setViewMode] = React.useState<ViewMode>("intro");
@@ -129,7 +129,7 @@ const Index = () => {
   return <div className="min-h-screen bg-background p-4 md:p-8 relative">
       {/* Timer and timeline controls at top center */}
       <div className="max-w-7xl mx-auto space-y-4" style={{
-      marginBottom: '100px'
+      marginBottom: '50px'
     }}>
         <div className="flex justify-center">
           <Timer />
@@ -279,7 +279,8 @@ const Index = () => {
                   fontSize: '14px',
                   fontFamily: 'PP Mori, sans-serif',
                   whiteSpace: 'nowrap' as const,
-                  pointerEvents: 'none' as const
+                  pointerEvents: 'none' as const,
+                  color: '#CFBD94'
                 } : undefined;
 
                 // Unique clipPath ID for each layer

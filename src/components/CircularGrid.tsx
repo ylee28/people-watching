@@ -87,7 +87,7 @@ export const CircularGrid: React.FC<CircularGridProps> = ({
               d={pathData}
               fill="none"
               stroke="#CFBD94"
-              strokeWidth="4"
+              strokeWidth="12"
               opacity="0.6"
             />
           </g>

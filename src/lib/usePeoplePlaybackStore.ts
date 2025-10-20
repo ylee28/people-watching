@@ -308,11 +308,11 @@ export const usePeoplePlaybackStore = create<PeoplePlaybackStore>((set, get) => 
   tick: (deltaTime: number) => {
     const { timeSec, speed, durationSec } = get();
     
-    // Auto-loop at end
+    // Stop at end, don't loop
     let newTime = timeSec + deltaTime * speed;
     if (newTime >= durationSec) {
-      newTime = 0;
-      console.log('[TIME] Auto-loop → back to 0s');
+      newTime = durationSec;
+      console.log('[TIME] Reached end, staying at final frame');
     }
     
     set({ timeSec: newTime });
