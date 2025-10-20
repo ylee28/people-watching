@@ -6,7 +6,7 @@ const layerLabels: Record<LayerType, string> = {
   dwell: "Dwell Time",
   notes: "Notes",
   movement: "Path",
-  coverage: "Coverage"
+  coverage: "Other"
 };
 const layerColors: Record<LayerType, string> = {
   colors: "from-red-500 to-orange-500",
@@ -26,20 +26,19 @@ export const LayerNavButtons: React.FC<LayerNavButtonsProps> = ({
   layout = "vertical"
 }) => {
   const layers: LayerType[] = ["colors", "dwell", "notes", "movement", "coverage"];
-  return <div className={`flex ${layout === "vertical" ? "flex-col gap-3" : "flex-row gap-2 overflow-x-auto pb-2"}`}>
+  return <div className={`flex ${layout === "vertical" ? "flex-col gap-3" : "flex-row gap-2 overflow-x-auto pb-2"}`} style={{ marginLeft: '-200px' }}>
       {layers.map(layer => {
       const isActive = activeLayer === layer;
-      return <motion.button key={layer} onClick={() => onSelect(layer)} className={`
-              px-4 py-2 rounded-lg font-medium transition-all
-              ${isActive ? "bg-gradient-to-r text-white shadow-lg" : "bg-muted hover:bg-muted/80"}
-              ${isActive ? layerColors[layer] : ""}
-            `} whileHover={{
-        scale: 1.02
-      }} whileTap={{
-        scale: 0.98
-      }}>
+      return <button key={layer} onClick={() => onSelect(layer)} className="font-mori cursor-pointer hover:opacity-70 transition-opacity" style={{
+              fontSize: '14px',
+              color: '#CFBD94',
+              background: 'none',
+              border: 'none',
+              padding: '8px 0',
+              textAlign: 'left'
+            }}>
             {layerLabels[layer]}
-          </motion.button>;
+          </button>;
     })}
     </div>;
 };
