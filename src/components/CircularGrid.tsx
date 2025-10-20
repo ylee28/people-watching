@@ -14,7 +14,7 @@ interface CircularGridProps {
  * - Benches at specified positions
  */
 export const CircularGrid: React.FC<CircularGridProps> = ({
-  size = 800,
+  size = 520,
   className = "",
 }) => {
   const center = size / 2;
