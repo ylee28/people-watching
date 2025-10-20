@@ -128,7 +128,9 @@ const Index = () => {
   };
   return <div className="min-h-screen bg-background p-4 md:p-8 relative">
       {/* Timer and timeline controls at top center */}
-      <div className="max-w-7xl mx-auto space-y-4" style={{ marginBottom: '100px' }}>
+      <div className="max-w-7xl mx-auto space-y-4" style={{
+      marginBottom: '100px'
+    }}>
         <div className="flex justify-center">
           <Timer />
         </div>
@@ -140,12 +142,7 @@ const Index = () => {
         <div className="flex flex-wrap gap-4 items-center justify-between">
           {/* Intro Style Reference (Intro only) */}
           {viewMode === "intro" && <div className="flex flex-wrap gap-4 items-center">
-              <div className="flex items-center gap-2">
-                <Label htmlFor="intro-style-file" className="text-sm cursor-pointer">
-                  Intro Style:
-                </Label>
-                
-              </div>
+              
               
               {introStyleImage && <>
                   <div className="flex items-center gap-2">
@@ -193,15 +190,13 @@ const Index = () => {
       </div>
 
       {/* Back button in bottom left corner */}
-      {(viewMode === "focus" || introMode === "exploded") && (
-        <div 
-          onClick={viewMode === "focus" ? handleBack : handleBackgroundClick} 
-          className="fixed bottom-8 left-8 font-tiny cursor-pointer hover:opacity-70 transition-opacity z-50"
-          style={{ fontSize: '100pt', lineHeight: '1', color: '#CFBD94' }}
-        >
+      {(viewMode === "focus" || introMode === "exploded") && <div onClick={viewMode === "focus" ? handleBack : handleBackgroundClick} className="fixed bottom-8 left-8 font-tiny cursor-pointer hover:opacity-70 transition-opacity z-50" style={{
+      fontSize: '100pt',
+      lineHeight: '1',
+      color: '#CFBD94'
+    }}>
           &lt;
-        </div>
-      )}
+        </div>}
 
       {/* Main visualization area - full viewport to prevent cutoff */}
       <div className="w-full h-[calc(100vh-300px)] flex justify-center items-center gap-8 overflow-visible">
@@ -274,7 +269,7 @@ const Index = () => {
                   yOffset = (idx - 2) * (ovalHeight + gap);
                   containerHeight = ovalHeight;
                 }
-                
+
                 // Label position for exploded view - 100px to the left
                 const labelStyle = introMode === "exploded" ? {
                   position: 'absolute' as const,
@@ -314,9 +309,7 @@ const Index = () => {
                   }
                 }}>
                         {/* Layer label - 100px to the left in exploded view */}
-                        {introMode === "exploded" && labelStyle && (
-                          <div style={labelStyle}>{layerLabels[layer]}</div>
-                        )}
+                        {introMode === "exploded" && labelStyle && <div style={labelStyle}>{layerLabels[layer]}</div>}
                         
                         {introMode === "exploded" ?
                   // Render live layer visualization in thin oval (with scaleY transform)

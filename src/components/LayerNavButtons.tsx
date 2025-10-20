@@ -29,15 +29,7 @@ export const LayerNavButtons: React.FC<LayerNavButtonsProps> = ({
   return <div className={`flex ${layout === "vertical" ? "flex-col gap-3" : "flex-row gap-2 overflow-x-auto pb-2"}`}>
       {layers.map(layer => {
       const isActive = activeLayer === layer;
-      return (
-        <div
-          key={layer}
-          onClick={() => onSelect(layer)}
-          className="text-foreground font-ppmori cursor-pointer hover:opacity-70 transition-opacity"
-        >
-          {layerLabels[layer]}
-        </div>
-      );
+      return;
     })}
     </div>;
 };
