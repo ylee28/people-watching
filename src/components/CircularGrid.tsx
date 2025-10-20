@@ -42,7 +42,7 @@ export const CircularGrid: React.FC<CircularGridProps> = ({
             stroke="#CFBD94"
             strokeWidth="2"
             strokeDasharray="8 8"
-            opacity="0.15"
+            opacity="1.0"
           />
         );
       })}
@@ -61,7 +61,7 @@ export const CircularGrid: React.FC<CircularGridProps> = ({
             stroke="#CFBD94"
             strokeWidth="2"
             strokeDasharray="8 8"
-            opacity="0.15"
+            opacity="1.0"
           />
         );
       })}

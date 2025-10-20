@@ -126,9 +126,9 @@ const Index = () => {
         return <UnifiedColors />;
     }
   };
-  return <div className="min-h-screen bg-background p-4 md:p-8">
+  return <div className="min-h-screen bg-background p-4 md:p-8 relative">
       {/* Timer and timeline controls at top center */}
-      <div className="max-w-7xl mx-auto mb-6 space-y-4">
+      <div className="max-w-7xl mx-auto space-y-4" style={{ marginBottom: '100px' }}>
         <div className="flex justify-center">
           <Timer />
         </div>
@@ -138,23 +138,6 @@ const Index = () => {
       {/* Header controls */}
       <div className="max-w-7xl mx-auto mb-8 space-y-4">
         <div className="flex flex-wrap gap-4 items-center justify-between">
-          <div className="flex gap-2">
-            {viewMode === "focus" && <div 
-                onClick={handleBack} 
-                className="font-tiny cursor-pointer hover:opacity-70 transition-opacity text-foreground"
-                style={{ fontSize: '100pt', lineHeight: '1' }}
-              >
-                &lt;
-              </div>}
-            {introMode === "exploded" && viewMode === "intro" && <div 
-                onClick={handleBackgroundClick} 
-                className="font-tiny cursor-pointer hover:opacity-70 transition-opacity text-foreground"
-                style={{ fontSize: '100pt', lineHeight: '1' }}
-              >
-                &lt;
-              </div>}
-          </div>
-
           {/* Intro Style Reference (Intro only) */}
           {viewMode === "intro" && <div className="flex flex-wrap gap-4 items-center">
               <div className="flex items-center gap-2">
@@ -208,6 +191,17 @@ const Index = () => {
             </div>}
         </div>
       </div>
+
+      {/* Back button in bottom left corner */}
+      {(viewMode === "focus" || introMode === "exploded") && (
+        <div 
+          onClick={viewMode === "focus" ? handleBack : handleBackgroundClick} 
+          className="fixed bottom-8 left-8 font-tiny cursor-pointer hover:opacity-70 transition-opacity z-50"
+          style={{ fontSize: '100pt', lineHeight: '1', color: '#CFBD94' }}
+        >
+          &lt;
+        </div>
+      )}
 
       {/* Main visualization area - full viewport to prevent cutoff */}
       <div className="w-full h-[calc(100vh-300px)] flex justify-center items-center gap-8 overflow-visible">
@@ -281,16 +275,17 @@ const Index = () => {
                   containerHeight = ovalHeight;
                 }
                 
-                // Label position for exploded view - 300px to the left of leftmost edge
+                // Label position for exploded view - aligned with back button (bottom left)
                 const labelStyle = introMode === "exploded" ? {
-                  position: 'absolute' as const,
-                  left: -300,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
+                  position: 'fixed' as const,
+                  left: '200px',
+                  bottom: '100px',
                   fontSize: '14px',
                   fontFamily: 'PP Mori, sans-serif',
+                  color: '#CFBD94',
                   whiteSpace: 'nowrap' as const,
-                  pointerEvents: 'none' as const
+                  pointerEvents: 'none' as const,
+                  zIndex: 40
                 } : undefined;
 
                 // Unique clipPath ID for each layer
