@@ -4,15 +4,6 @@ import { polarToCartesian } from "@/lib/roomGeometry";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { usePeoplePlaybackStore } from "@/lib/usePeoplePlaybackStore";
-import p1Image from "@/assets/p1.png";
-import p2Image from "@/assets/p2.png";
-import p3Image from "@/assets/p3.png";
-import p4Image from "@/assets/p4.png";
-import p5Image from "@/assets/p5.png";
-import p6Image from "@/assets/p6.png";
-import p7Image from "@/assets/p7.png";
-import p8Image from "@/assets/p8.png";
-import p9Image from "@/assets/p9.png";
 
 interface UnifiedColorsProps {
   size?: number;
@@ -41,18 +32,27 @@ export const UnifiedColors: React.FC<UnifiedColorsProps> = ({ size = 520 }) => {
   const center = size / 2;
   const maxRadius = size / 2 - 20;
 
-  // Map person IDs to their images
-  const personImages: Record<string, string> = {
-    'p1': p1Image,
-    'p2': p2Image,
-    'p3': p3Image,
-    'p4': p4Image,
-    'p5': p5Image,
-    'p6': p6Image,
-    'p7': p7Image,
-    'p8': p8Image,
-    'p9': p9Image,
+  // Canonicalize person ID: P01, P02, etc.
+  const canonicalId = (id: string) => {
+    const m = String(id).trim().match(/^p?0?(\d+)$/i);
+    if (m) return `P${String(Number(m[1])).padStart(2, '0')}`;
+    return String(id).trim().toUpperCase();
   };
+
+  // Map person ID to avatar path
+  const avatarSrcFor = (id: string): string => {
+    const n = Number(canonicalId(id).slice(1));
+    if (!Number.isFinite(n) || n < 1 || n > 9) return '';
+    return `/avatars/p${n}.png`;
+  };
+
+  // Preload avatars
+  React.useEffect(() => {
+    for (let i = 1; i <= 9; i++) {
+      const img = new Image();
+      img.src = `/avatars/p${i}.png`;
+    }
+  }, []);
 
   // Animate enter/exit
   React.useEffect(() => {
@@ -175,8 +175,8 @@ export const UnifiedColors: React.FC<UnifiedColorsProps> = ({ size = 520 }) => {
                 person.currentAngleDeg
               );
               const isHovered = hoveredId === person.id;
-              const imageUrl = personImages[person.id.toLowerCase()];
-              const imageSize = isHovered ? 20 : 16;
+              const imageUrl = avatarSrcFor(person.id);
+              const imageSize = isHovered ? 24 : 20;
 
               return (
                 <g key={person.id} opacity={opacity}>
