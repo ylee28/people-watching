@@ -119,285 +119,330 @@ const Index = () => {
         return <UnifiedColors />;
     }
   };
-  return <div className="min-h-screen bg-background p-4 md:p-8 relative">
-      {/* Timer and timeline controls at top center */}
-      <div className="max-w-7xl mx-auto space-y-4" style={{
-      marginBottom: '25px'
-    }}>
-        <div className="flex justify-center">
-          <Timer />
-        </div>
+  return (
+    <div className="app-shell">
+      {/* Header row */}
+      <div className="app-header">
+        <Timer />
         <TimelineControls />
-      </div>
-
-      {/* Header controls */}
-      <div className="max-w-7xl mx-auto mb-8 space-y-4">
-        <div className="flex flex-wrap gap-4 items-center justify-between">
+        
+        {/* Header controls */}
+        <div className="flex flex-wrap gap-4 items-center justify-center">
           {/* Intro Style Reference (Intro only) */}
-          {viewMode === "intro" && <div className="flex flex-wrap gap-4 items-center">
-              
-              
-              {introStyleImage && <>
-                  <div className="flex items-center gap-2">
-                    <Label className="text-sm">Opacity:</Label>
-                    <Slider value={[introStyleOpacity]} onValueChange={v => setIntroStyleOpacity(v[0])} min={0} max={100} step={1} className="w-24" />
-                    <span className="text-xs text-muted-foreground">{introStyleOpacity}%</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant={introStylePosition === "below" ? "default" : "outline"} onClick={() => setIntroStylePosition("below")} size="sm">
-                      Below
-                    </Button>
-                    <Button variant={introStylePosition === "above" ? "default" : "outline"} onClick={() => setIntroStylePosition("above")} size="sm">
-                      Above
-                    </Button>
-                  </div>
-                </>}
-            </div>}
+          {viewMode === "intro" && introStyleImage && (
+            <div className="flex flex-wrap gap-2 items-center text-xs">
+              <div className="flex items-center gap-2">
+                <Label className="text-sm">Opacity:</Label>
+                <Slider 
+                  value={[introStyleOpacity]} 
+                  onValueChange={v => setIntroStyleOpacity(v[0])} 
+                  min={0} max={100} step={1} 
+                  className="w-20" 
+                />
+                <span className="text-xs text-muted-foreground">{introStyleOpacity}%</span>
+              </div>
+              <div className="flex gap-1">
+                <Button 
+                  variant={introStylePosition === "below" ? "default" : "outline"} 
+                  onClick={() => setIntroStylePosition("below")} 
+                  size="sm"
+                >
+                  Below
+                </Button>
+                <Button 
+                  variant={introStylePosition === "above" ? "default" : "outline"} 
+                  onClick={() => setIntroStylePosition("above")} 
+                  size="sm"
+                >
+                  Above
+                </Button>
+              </div>
+            </div>
+          )}
 
           {/* Overlay controls (Focus only) */}
-          {viewMode === "focus" && <div className="flex flex-wrap gap-4 items-center">
-            <div className="flex items-center gap-2">
-              <Label htmlFor="overlay-file" className="text-sm cursor-pointer">
-                Overlay:
-              </Label>
-              
+          {viewMode === "focus" && overlayImage && (
+            <div className="flex flex-wrap gap-2 items-center text-xs">
+              <div className="flex items-center gap-2">
+                <Label className="text-sm">Opacity:</Label>
+                <Slider 
+                  value={[overlayOpacity]} 
+                  onValueChange={v => setOverlayOpacity(v[0])} 
+                  min={0} max={100} step={1} 
+                  className="w-20" 
+                />
+                <span className="text-xs text-muted-foreground">{overlayOpacity}%</span>
+              </div>
+              <div className="flex gap-1">
+                <Button 
+                  variant={overlayPosition === "below" ? "default" : "outline"} 
+                  onClick={() => setOverlayPosition("below")} 
+                  size="sm"
+                >
+                  Below
+                </Button>
+                <Button 
+                  variant={overlayPosition === "above" ? "default" : "outline"} 
+                  onClick={() => setOverlayPosition("above")} 
+                  size="sm"
+                >
+                  Above
+                </Button>
+              </div>
             </div>
-            
-            {overlayImage && <>
-                <div className="flex items-center gap-2">
-                  <Label className="text-sm">Opacity:</Label>
-                  <Slider value={[overlayOpacity]} onValueChange={v => setOverlayOpacity(v[0])} min={0} max={100} step={1} className="w-24" />
-                  <span className="text-xs text-muted-foreground">{overlayOpacity}%</span>
-                </div>
-                <div className="flex gap-2">
-                  <Button variant={overlayPosition === "below" ? "default" : "outline"} onClick={() => setOverlayPosition("below")} size="sm">
-                    Below
-                  </Button>
-                  <Button variant={overlayPosition === "above" ? "default" : "outline"} onClick={() => setOverlayPosition("above")} size="sm">
-                    Above
-                  </Button>
-                </div>
-              </>}
-            </div>}
+          )}
         </div>
       </div>
 
-      {/* Back button in bottom left corner */}
-      {(viewMode === "focus" || introMode === "exploded") && <div onClick={viewMode === "focus" ? handleBack : handleBackgroundClick} className="fixed bottom-8 left-8 font-tiny cursor-pointer hover:opacity-70 transition-opacity z-50" style={{
-      fontSize: '100pt',
-      lineHeight: '1',
-      color: '#CFBD94'
-    }}>
-          &lt;
-        </div>}
-
-      {/* Main visualization area - full viewport to prevent cutoff */}
-      <div className="w-full h-[calc(100vh-300px)] flex justify-center items-center gap-8 overflow-visible">
-        {/* Layer navigation buttons - beside the grid, only in exploded view */}
-        {viewMode === "intro" && introMode === "exploded" && <div className="hidden lg:block flex-shrink-0">
+      {/* Main content row */}
+      <div className={`app-main ${viewMode === "intro" && introMode === "exploded" ? "with-sidebar" : ""}`}>
+        {/* Left sidebar - layer buttons (exploded view only) */}
+        {viewMode === "intro" && introMode === "exploded" && (
+          <div className="left-sidebar hidden md:flex flex-col justify-center">
             <LayerNavButtons onSelect={goToLayer} activeLayer={selectedLayer} layout="vertical" />
-          </div>}
+          </div>
+        )}
         
-        <AnimatePresence mode="wait">
-          {/* INTRO VIEW - Overlapped ↔ Exploded */}
-          {viewMode === "intro" && <motion.div key="intro" initial={{
-          opacity: 0
-        }} animate={{
-          opacity: 1
-        }} exit={{
-          opacity: 0
-        }} className="relative flex flex-col items-center gap-6">
-              {/* Mobile buttons - above grid, only in exploded view */}
-              {introMode === "exploded" && <div className="lg:hidden w-full max-w-md">
-                <LayerNavButtons onSelect={goToLayer} activeLayer={selectedLayer} layout="horizontal" />
-              </div>}
-              
-              <div className="relative" style={{
-            perspective: "none"
-          }}>
-                {/* Intro Style Reference Overlay (below) */}
-                {introStyleImage && introStylePosition === "below" && <img src={introStyleImage} alt="Intro style reference" className="absolute inset-0 m-auto pointer-events-none" style={{
-              width: 520,
-              height: 520,
-              opacity: introStyleOpacity / 100,
-              zIndex: 0
-            }} />}
+        {/* Visualization stage */}
+        <div className="viz-stage">
+          <div className="viz-canvas">
+            <AnimatePresence mode="wait">
+              {/* INTRO VIEW */}
+              {viewMode === "intro" && (
+                <motion.div
+                  key="intro"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="w-full h-full relative flex flex-col items-center justify-center gap-4"
+                >
+                  {/* Mobile buttons above (exploded only) */}
+                  {introMode === "exploded" && (
+                    <div className="md:hidden w-full max-w-md px-4">
+                      <LayerNavButtons onSelect={goToLayer} activeLayer={selectedLayer} layout="horizontal" />
+                    </div>
+                  )}
 
-                {/* Circular click area for overlapped state - full circle clickable */}
-                {introMode === "overlapped" && <div className="absolute cursor-pointer" style={{
-              width: 520,
-              height: 520,
-              borderRadius: "50%",
-              left: '50%',
-              top: '50%',
-              transform: 'translate(-50%, -50%)',
-              zIndex: 10
-            }} onClick={handleIntroClick} role="button" tabIndex={0} onKeyDown={e => e.key === "Enter" && handleIntroClick()} aria-label="Click to explode layers" />}
+                  {/* SVG container */}
+                  <div className="relative flex-1 w-full flex items-center justify-center">
+                    <svg
+                      className="viz-svg"
+                      viewBox="-280 -280 560 560"
+                      preserveAspectRatio="xMidYMid meet"
+                    >
+                      <defs>
+                        {/* Clip paths for each layer in exploded view */}
+                        {layers.map(layer => (
+                          <clipPath key={`clip-${layer}`} id={`oval-clip-${layer}`}>
+                            <ellipse cx="0" cy="0" rx="256" ry="56" />
+                          </clipPath>
+                        ))}
+                      </defs>
 
-                {/* Background click area for exploded state */}
-                {introMode === "exploded" && <div className="absolute inset-0 m-auto cursor-pointer" style={{
-              width: 600,
-              height: 600,
-              zIndex: 1
-            }} onClick={handleBackgroundClick} aria-label="Click background to return to overlapped view" />}
+                      {/* Background overlay (below) */}
+                      {introStyleImage && introStylePosition === "below" && (
+                        <image
+                          href={introStyleImage}
+                          x="-260"
+                          y="-260"
+                          width="520"
+                          height="520"
+                          opacity={introStyleOpacity / 100}
+                          preserveAspectRatio="xMidYMid meet"
+                        />
+                      )}
 
-                {/* Layer stack */}
-                <div className="relative" style={{
-              transformStyle: "preserve-3d"
-            }}>
-                  {layers.map((layer, idx) => {
-                const circleDiameter = 520;
-                const ovalWidth = circleDiameter;
-                const ovalHeight = circleDiameter * 0.22; // 114.4px
-                const ellipseScaleY = 0.22; // vertical squash factor
+                      {/* Clickable area for overlapped -> exploded */}
+                      {introMode === "overlapped" && (
+                        <circle
+                          cx="0"
+                          cy="0"
+                          r="260"
+                          fill="transparent"
+                          style={{ cursor: 'pointer' }}
+                          onClick={handleIntroClick}
+                        />
+                      )}
 
-                // Fixed 5px gap between ovals
-                const gap = 5;
-                let yOffset = 0;
-                let containerHeight = circleDiameter;
-                if (introMode === "overlapped") {
-                  yOffset = 0; // All perfectly overlapped
-                } else if (introMode === "exploded") {
-                  // y(i) = centerY + (i - 2) * (ovalHeight + gap)
-                  yOffset = (idx - 2) * (ovalHeight + gap);
-                  containerHeight = ovalHeight;
-                }
+                      {/* Layer stack */}
+                      <g id="layer-stack">
+                        {layers.map((layer, idx) => {
+                          const ovalHeight = 520 * 0.22; // 114.4px
+                          const gap = 5;
+                          
+                          // Calculate y offset for exploded view
+                          const yOffset = introMode === "exploded" 
+                            ? (idx - 2) * (ovalHeight + gap)
+                            : 0;
 
-                // Label position for exploded view - 100px to the left
-                const labelStyle = introMode === "exploded" ? {
-                  position: 'absolute' as const,
-                  left: '-100px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  fontSize: '21px',
-                  fontFamily: 'PP Mori, sans-serif',
-                  whiteSpace: 'nowrap' as const,
-                  pointerEvents: 'none' as const,
-                  color: '#CFBD94'
-                } : undefined;
+                          return (
+                            <g key={layer}>
+                              <motion.g
+                                initial={false}
+                                animate={{
+                                  y: yOffset,
+                                  scaleY: introMode === "exploded" ? 0.22 : 1
+                                }}
+                                transition={{
+                                  duration: 0.6,
+                                  ease: "easeOut"
+                                }}
+                                style={{
+                                  cursor: introMode === "exploded" ? "pointer" : "default"
+                                }}
+                                onClick={(e: any) => {
+                                  if (introMode === "exploded") {
+                                    e.stopPropagation();
+                                    goToLayer(layer);
+                                  }
+                                }}
+                                whileHover={introMode === "exploded" ? { scale: 1.02 } : undefined}
+                              >
+                                {/* Clip group for exploded view */}
+                                {introMode === "exploded" && (
+                                  <g clipPath={`url(#oval-clip-${layer})`}>
+                                    <foreignObject x="-260" y="-260" width="520" height="520">
+                                      <div style={{ width: 520, height: 520 }}>
+                                        {renderLayer(layer)}
+                                      </div>
+                                    </foreignObject>
+                                  </g>
+                                )}
 
-                // Unique clipPath ID for each layer
-                const clipId = `oval-clip-${layer}`;
-                return <motion.div key={layer} id={`layer-${layer}`} className="absolute overflow-hidden" style={{
-                  zIndex: layers.length - idx + 10,
-                  left: "50%",
-                  top: "50%",
-                  marginLeft: -ovalWidth / 2,
-                  marginTop: introMode === "exploded" ? -ovalHeight / 2 : -circleDiameter / 2,
-                  width: ovalWidth,
-                  height: containerHeight,
-                  pointerEvents: introMode === "exploded" ? "auto" : "none",
-                  cursor: introMode === "exploded" ? "pointer" : "default"
-                }} initial={false} animate={{
-                  y: yOffset,
-                  rotateX: 0
-                }} transition={{
-                  duration: 0.6,
-                  ease: "easeOut"
-                }} whileHover={introMode === "exploded" ? {
-                  scale: 1.02
-                } : undefined} onClick={e => {
-                  if (introMode === "exploded") {
-                    e.stopPropagation(); // Prevent background click
-                    goToLayer(layer);
-                  }
-                }}>
-                        {/* Layer label - 100px to the left in exploded view */}
-                        {introMode === "exploded" && labelStyle && <div style={labelStyle}>{layerLabels[layer]}</div>}
-                        
-                        {introMode === "exploded" ?
-                  // Render live layer visualization in thin oval (with scaleY transform)
-                  <svg width={ovalWidth} height={ovalHeight} viewBox={`0 0 ${ovalWidth} ${ovalHeight}`} style={{
-                    display: 'block'
-                  }}>
-                            <defs>
-                              {/* Ellipse clipPath */}
-                              <clipPath id={clipId}>
-                                <ellipse cx={ovalWidth / 2} cy={ovalHeight / 2} rx={ovalWidth / 2 - 1} ry={ovalHeight / 2 - 1} />
-                              </clipPath>
-                            </defs>
-                            
-                            {/* Container for scaled visualization */}
-                            <g clipPath={`url(#${clipId})`}>
-                              {/* Scale the entire layer visualization vertically */}
-                              <g transform={`translate(${ovalWidth / 2}, ${ovalHeight / 2}) scale(1, ${ellipseScaleY}) translate(-${circleDiameter / 2}, -${circleDiameter / 2})`}>
-                                <foreignObject width={circleDiameter} height={circleDiameter} style={{
-                          pointerEvents: 'none'
-                        }}>
-                                  <div style={{
-                            width: circleDiameter,
-                            height: circleDiameter
-                          }}>
-                                    {renderLayer(layer)}
-                                  </div>
-                                </foreignObject>
-                              </g>
+                                {/* No clip for overlapped view */}
+                                {introMode === "overlapped" && (
+                                  <foreignObject x="-260" y="-260" width="520" height="520">
+                                    <div style={{ width: 520, height: 520 }}>
+                                      {renderLayer(layer)}
+                                    </div>
+                                  </foreignObject>
+                                )}
+                              </motion.g>
+
+                              {/* Layer label (exploded only) */}
+                              {introMode === "exploded" && (
+                                <motion.text
+                                  initial={false}
+                                  animate={{ y: yOffset }}
+                                  transition={{ duration: 0.6, ease: "easeOut" }}
+                                  x="-300"
+                                  y="0"
+                                  textAnchor="end"
+                                  dominantBaseline="middle"
+                                  fill="#CFBD94"
+                                  fontSize="21"
+                                  fontFamily="PP Mori, sans-serif"
+                                  style={{ pointerEvents: 'none' }}
+                                >
+                                  {layerLabels[layer]}
+                                </motion.text>
+                              )}
                             </g>
-                          </svg> :
-                  // Render full layer visualization in overlapped view
-                  renderLayer(layer)}
-                      </motion.div>;
-              })}
-                </div>
+                          );
+                        })}
+                      </g>
 
-                {/* Intro Style Reference Overlay (above) */}
-                {introStyleImage && introStylePosition === "above" && <img src={introStyleImage} alt="Intro style reference" className="absolute inset-0 m-auto pointer-events-none" style={{
-              width: 520,
-              height: 520,
-              opacity: introStyleOpacity / 100,
-              zIndex: 20
-            }} />}
-              </div>
-            </motion.div>}
+                      {/* Background click area for exploded -> overlapped */}
+                      {introMode === "exploded" && (
+                        <rect
+                          x="-300"
+                          y="-300"
+                          width="600"
+                          height="600"
+                          fill="transparent"
+                          style={{ cursor: 'pointer' }}
+                          onClick={handleBackgroundClick}
+                        />
+                      )}
 
-          {/* FOCUS VIEW - Single layer full circle */}
-          {viewMode === "focus" && selectedLayer && <motion.div key="focus" initial={{
-          scale: 0.8,
-          opacity: 0
-        }} animate={{
-          scale: 1,
-          opacity: 1
-        }} exit={{
-          scale: 0.8,
-          opacity: 0
-        }} className="flex items-center gap-8">
-              {/* Title on the left */}
-              
-              
-              <div className="relative flex justify-center">
-                {/* Overlay below */}
-                {overlayImage && overlayPosition === "below" && <img src={overlayImage} alt="Overlay" className="absolute inset-0 m-auto" style={{
-              width: 520,
-              height: 520,
-              opacity: overlayOpacity / 100,
-              zIndex: 0
-            }} />}
+                      {/* Foreground overlay (above) */}
+                      {introStyleImage && introStylePosition === "above" && (
+                        <image
+                          href={introStyleImage}
+                          x="-260"
+                          y="-260"
+                          width="520"
+                          height="520"
+                          opacity={introStyleOpacity / 100}
+                          preserveAspectRatio="xMidYMid meet"
+                          style={{ pointerEvents: 'none' }}
+                        />
+                      )}
+                    </svg>
+                  </div>
+                </motion.div>
+              )}
 
-                {/* Layer visualization */}
-                <div style={{
-              position: "relative",
-              zIndex: 1
-            }}>
-                  {renderLayer(selectedLayer)}
-                </div>
+              {/* FOCUS VIEW */}
+              {viewMode === "focus" && selectedLayer && (
+                <motion.div
+                  key="focus"
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.8, opacity: 0 }}
+                  className="w-full h-full relative flex items-center justify-center"
+                >
+                  <svg
+                    className="viz-svg"
+                    viewBox="-280 -280 560 560"
+                    preserveAspectRatio="xMidYMid meet"
+                  >
+                    {/* Overlay below */}
+                    {overlayImage && overlayPosition === "below" && (
+                      <image
+                        href={overlayImage}
+                        x="-260"
+                        y="-260"
+                        width="520"
+                        height="520"
+                        opacity={overlayOpacity / 100}
+                        preserveAspectRatio="xMidYMid meet"
+                      />
+                    )}
 
-                {/* Overlay above */}
-                {overlayImage && overlayPosition === "above" && <img src={overlayImage} alt="Overlay" className="absolute inset-0 m-auto" style={{
-              width: 520,
-              height: 520,
-              opacity: overlayOpacity / 100,
-              zIndex: 2,
-              pointerEvents: "none"
-            }} />}
-              </div>
-            </motion.div>}
-        </AnimatePresence>
+                    {/* Layer visualization */}
+                    <foreignObject x="-260" y="-260" width="520" height="520">
+                      <div style={{ width: 520, height: 520 }}>
+                        {renderLayer(selectedLayer)}
+                      </div>
+                    </foreignObject>
+
+                    {/* Overlay above */}
+                    {overlayImage && overlayPosition === "above" && (
+                      <image
+                        href={overlayImage}
+                        x="-260"
+                        y="-260"
+                        width="520"
+                        height="520"
+                        opacity={overlayOpacity / 100}
+                        preserveAspectRatio="xMidYMid meet"
+                        style={{ pointerEvents: 'none' }}
+                      />
+                    )}
+                  </svg>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
       </div>
 
-      {/* Keyboard shortcuts help */}
-      <div className="max-w-7xl mx-auto mt-8 text-center text-xs text-muted-foreground">
-        
-      </div>
-    </div>;
+      {/* Back button */}
+      {(viewMode === "focus" || introMode === "exploded") && (
+        <div
+          onClick={viewMode === "focus" ? handleBack : handleBackgroundClick}
+          className="fixed bottom-8 left-8 font-tiny cursor-pointer hover:opacity-70 transition-opacity z-50"
+          style={{
+            fontSize: '100pt',
+            lineHeight: '1',
+            color: '#CFBD94'
+          }}
+        >
+          &lt;
+        </div>
+      )}
+    </div>
+  );
 };
 export default Index;
