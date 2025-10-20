@@ -275,17 +275,16 @@ const Index = () => {
                   containerHeight = ovalHeight;
                 }
                 
-                // Label position for exploded view - aligned with back button (bottom left)
+                // Label position for exploded view - 100px to the left
                 const labelStyle = introMode === "exploded" ? {
-                  position: 'fixed' as const,
-                  left: '200px',
-                  bottom: '100px',
+                  position: 'absolute' as const,
+                  left: '-100px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
                   fontSize: '14px',
                   fontFamily: 'PP Mori, sans-serif',
-                  color: '#CFBD94',
                   whiteSpace: 'nowrap' as const,
-                  pointerEvents: 'none' as const,
-                  zIndex: 40
+                  pointerEvents: 'none' as const
                 } : undefined;
 
                 // Unique clipPath ID for each layer
